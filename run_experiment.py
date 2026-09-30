@@ -3,9 +3,10 @@
     python run_experiment.py            # full run (about an hour on a 2-core CPU)
     python run_experiment.py --quick    # tiny smoke run (a couple of minutes), writes results-quick/
 
-The other scripts in the repository (baselines.py, timing.py,
-ablation_log_input.py, check_reference.py) read these outputs and add their
-own result files; make_figures.py draws the figures from all of them.
+The other scripts in the repository (check_reference.py, baselines.py,
+ablation_log_input.py, timing.py) read these outputs and add their own result
+files; make_figures.py draws the figures from all of them. Each takes
+--results DIR, so the whole pipeline also runs on results-quick/.
 """
 
 from __future__ import annotations
@@ -14,25 +15,25 @@ import argparse
 import json
 import os
 import pickle
-import platform
-import sys
 import time
 from dataclasses import asdict
+from pathlib import Path
 
 import jax
-import jax.numpy as jnp
 import numpy as np
-import optax
-import scipy
 
-from elliptic1d import fields, operators, pinn, solver
+from elliptic1d import fields, operators, pinn, runs, solver
 from elliptic1d.config import Config, quick
 
-OUT = "results"          # set in main(); --quick writes to results-quick/ so it never overwrites the full run
+ROOT = Path(__file__).resolve().parent
+OUT = str(ROOT / "results")          # set in main(); --quick writes to results-quick/ instead
 
 
 def log(msg: str) -> None:
-    print(f"[{time.strftime('%H:%M:%S')}] {msg}", flush=True)
+    line = f"[{time.strftime('%H:%M:%S')}] {msg}"
+    print(line, flush=True)
+    with open(os.path.join(OUT, "run.log"), "a") as fh:
+        fh.write(line + "\n")
 
 
 def rel_l2(pred: np.ndarray, ref: np.ndarray) -> np.ndarray:
@@ -45,26 +46,6 @@ def summary(e: np.ndarray) -> dict:
             "p90": float(np.quantile(e, 0.9)), "max": float(e.max()), "n": int(e.size)}
 
 
-def cpu_name() -> str:
-    try:
-        with open("/proc/cpuinfo") as fh:
-            for line in fh:
-                if line.startswith("model name"):
-                    return line.split(":", 1)[1].strip()
-    except OSError:
-        pass
-    return platform.processor() or "unknown"
-
-
-def median_time(fn, repeats: int) -> float:
-    ts = []
-    for _ in range(repeats):
-        t0 = time.perf_counter()
-        fn()
-        ts.append(time.perf_counter() - t0)
-    return float(np.median(ts))
-
-
 def main() -> None:
     global OUT
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
@@ -72,15 +53,14 @@ def main() -> None:
     ap.add_argument("--out", default=None, help="output folder (default: results, or results-quick with --quick)")
     args = ap.parse_args()
     cfg = quick(Config()) if args.quick else Config()
-    OUT = args.out or ("results-quick" if args.quick else "results")
+    OUT = os.path.abspath(args.out or str(ROOT / ("results-quick" if args.quick else "results")))
+    if args.quick and Path(OUT) == ROOT / "results":
+        ap.error("--quick must not write into results/, which holds the full run")
     os.makedirs(OUT, exist_ok=True)
+    open(os.path.join(OUT, "run.log"), "w").close()
     res: dict = {
         "config": asdict(cfg),
-        "environment": {
-            "python": sys.version.split()[0], "jax": jax.__version__, "optax": optax.__version__,
-            "numpy": np.__version__, "scipy": scipy.__version__,
-            "cpu": cpu_name(), "cpu_count": os.cpu_count(), "quick": args.quick,
-        },
+        "environment": {**runs.environment(), "quick": args.quick},
     }
 
     def save() -> None:
@@ -88,16 +68,13 @@ def main() -> None:
             json.dump(res, fh, indent=1)
 
     # ------------------------------------------------------------------ data
-    rng = np.random.default_rng(cfg.seed)
-    n_pool = max(cfg.n_train_sweep + (cfg.n_train,))
-    families = {cfg.train_family.name: cfg.train_family, **{f.name: f for f in cfg.shift_families}}
-    pool = fields.sample(cfg.train_family, rng, n_pool)
-    tests = {name: fields.sample(fam, rng, cfg.n_test) for name, fam in families.items()}
+    n_pool = runs.pool_size(cfg)
+    pool, tests = runs.draws(cfg)
     x = solver.grid(cfg.n_grid)
     t0 = time.perf_counter()
     u_pool = solver.fd(pool, cfg.n_grid, cfg.f_const)
     res["data"] = {"n_pool": n_pool, "seconds_fd_labels_pool": time.perf_counter() - t0}
-    exact = {name: {n: solver.exact(p, n, cfg.n_fine) for n in cfg.test_resolutions}
+    exact = {name: {n: solver.exact(p, n, cfg.n_fine, f=cfg.f_const) for n in cfg.test_resolutions}
              for name, p in tests.items()}
     stats = {}
     for name, p in tests.items():
@@ -115,7 +92,7 @@ def main() -> None:
         sub = fields.take(p, slice(0, 50))
         conv[name] = {}
         for n in cfg.fd_convergence_grids:
-            e = rel_l2(solver.fd(sub, n, cfg.f_const), solver.exact(sub, n, cfg.n_fine))
+            e = rel_l2(solver.fd(sub, n, cfg.f_const), solver.exact(sub, n, cfg.n_fine, f=cfg.f_const))
             conv[name][n] = summary(e)
     fd129 = {name: summary(rel_l2(solver.fd(p, cfg.n_grid, cfg.f_const), exact[name][cfg.n_grid]))
              for name, p in tests.items()}
@@ -216,44 +193,13 @@ def main() -> None:
     save()
 
     # ---------------------------------------------------------- 5. timing
-    # Every method is timed from its own input arrays, already in memory: the
-    # harmonic cell coefficients for the solver, standardised log a at the
-    # sensors (DeepONet) or on the grid (FNO). Evaluating the random fields is
-    # a property of this synthetic benchmark, not of any method, so it is excluded.
-    p200 = tests["train"]
-    a_half = solver.cell_harmonic_a(p200, cfg.n_grid)
-    fd_one_times = []
-    for i in range(a_half.shape[0]):
-        t0 = time.perf_counter()
-        solver.fd_solve_one(a_half[i], cfg.f_const)
-        fd_one_times.append(time.perf_counter() - t0)
+    # Training and labelling times only. Inference is timed by timing.py, under one
+    # protocol for every method, from the models saved above.
     timing = {
-        "protocol": "from in-memory input arrays; field evaluation excluded; single = one field at a time",
-        "fd_single_seconds": float(np.median(fd_one_times)),
-        "fd_batch_seconds_per_instance":
-            median_time(lambda: solver.fd_solve_batch(a_half, cfg.f_const), 5) / cfg.n_test,
+        "note": "training and labelling times; inference timings are in timing.json (timing.py)",
         "fd_labels_seconds_per_instance": res["data"]["seconds_fd_labels_pool"] / n_pool,
-        "field_to_cell_coefficients_seconds_per_instance":
-            median_time(lambda: solver.cell_harmonic_a(p200, cfg.n_grid), 5) / cfg.n_test,
     }
-    xs = jnp.asarray(x, jnp.float32)
-    fdj = solver.fd_solver_jax()
-    a32 = jnp.asarray(a_half, jnp.float32)
-    jax.block_until_ready(fdj(a32[:1], cfg.f_const))
-    jax.block_until_ready(fdj(a32, cfg.f_const))
-    timing["fd_jax_single_seconds"] = median_time(lambda: jax.block_until_ready(fdj(a32[:1], cfg.f_const)), 200)
-    timing["fd_jax_batch_seconds_per_instance"] = median_time(
-        lambda: jax.block_until_ready(fdj(a32, cfg.f_const)), 20) / cfg.n_test
     for k in kinds:
-        op = headline[k][0]
-        f = operators._apply_jit[k]
-        g = op.scaler.g(operators.model_input(k, cfg, p200, cfg.n_grid))
-        g1 = g[:1]
-        jax.block_until_ready(f(op.params, g1, xs))              # compile both shapes first
-        jax.block_until_ready(f(op.params, g, xs))
-        timing[f"{k}_single_seconds"] = median_time(lambda: jax.block_until_ready(f(op.params, g1, xs)), 200)
-        timing[f"{k}_batch_seconds_per_instance"] = median_time(
-            lambda: jax.block_until_ready(f(op.params, g, xs)), 20) / cfg.n_test
         timing[f"{k}_train_seconds"] = [row["train_seconds"] for row in sweep[k][cfg.n_train]]
     for form in ("strong", "mixed"):
         timing[f"pinn_{form}_train_seconds_train_family"] = [r["seconds"] for r in pinn_res["train"][form]]

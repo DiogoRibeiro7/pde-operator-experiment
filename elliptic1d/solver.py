@@ -1,13 +1,13 @@
 """Reference solutions and the classical finite-difference solver.
 
 Exact solution. Integrating -(a u')' = f once gives the flux a u' = C - F(x),
-with F(x) = int_0^x f. With f = 1, F(x) = x, so
+with F(x) = int_0^x f. For a constant f, F(x) = f x, so
 
-    u(x) = C I0(x) - I1(x),   I0(x) = int_0^x 1/a,   I1(x) = int_0^x s/a(s) ds,
+    u(x) = f (C I0(x) - I1(x)),   I0(x) = int_0^x 1/a,   I1(x) = int_0^x s/a(s) ds,
 
 and u(1) = 0 fixes C = I1(1) / I0(1). The only approximation is the
 quadrature for I0 and I1: exact for piecewise-constant a, and cumulative
-Simpson on 2^15 + 1 points for smooth a.
+Simpson on at least 2^15 + 1 points for smooth a.
 
 Finite differences. A conservative (finite-volume) scheme on a uniform grid,
 
@@ -33,15 +33,22 @@ def grid(n: int) -> np.ndarray:
     return np.linspace(0.0, 1.0, n)
 
 
-def exact(p: dict, n: int, n_fine: int = 32769, chunk: int = 64) -> np.ndarray:
-    """Reference solution on the uniform n-point grid, shape (draws, n), float64."""
+def exact(p: dict, n: int, n_fine: int = 32769, chunk: int = 64, f: float = 1.0) -> np.ndarray:
+    """Reference solution for a constant right-hand side f on the uniform n-point grid,
+    shape (draws, n), float64.
+
+    For smooth coefficients the quadrature grid must contain the n-point grid. When
+    n - 1 does not divide n_fine - 1, the quadrature grid is refined to the smallest
+    nesting size that is at least n_fine."""
+    if n < 2:
+        raise ValueError("the grid needs at least two points")
     x = grid(n)
     if p["kind"] == "piecewise":
         I0, I1 = fields.inverse_a_primitives_piecewise(p, x)
         I0e, I1e = fields.inverse_a_primitives_piecewise(p, np.array([1.0]))
-        return (I1e / I0e) * I0 - I1
+        return f * ((I1e / I0e) * I0 - I1)
     if (n_fine - 1) % (n - 1):
-        raise ValueError("n - 1 must divide n_fine - 1 so the grids nest")
+        n_fine = (n - 1) * -(-(n_fine - 1) // (n - 1)) + 1
     step = (n_fine - 1) // (n - 1)
     xf = grid(n_fine)
     out = np.empty((fields.size(p), n))
@@ -51,7 +58,7 @@ def exact(p: dict, n: int, n_fine: int = 32769, chunk: int = 64) -> np.ndarray:
         I1 = cumulative_simpson(b * xf, x=xf, axis=1, initial=0.0)
         u = (I1[:, -1:] / I0[:, -1:]) * I0 - I1
         out[j : j + chunk] = u[:, ::step]
-    return out
+    return f * out
 
 
 def cell_harmonic_a(p: dict, n: int) -> np.ndarray:
@@ -84,11 +91,17 @@ def fd_solve_batch(a_half: np.ndarray, f: float = 1.0) -> np.ndarray:
     """The same scheme, solved for a whole batch at once with the Thomas algorithm."""
     B, m = a_half.shape
     n = m + 1
+    if n < 3:
+        raise ValueError("the grid needs at least one interior point (n >= 3)")
     h2 = (1.0 / (n - 1)) ** 2
     lower = -a_half[:, 1:-1] / h2           # sub-diagonal (length n - 3)
     diag = (a_half[:, :-1] + a_half[:, 1:]) / h2
     upper = lower                           # symmetric
     d = np.full((B, n - 2), f, dtype=np.float64)
+    if n == 3:                              # one unknown: no recursion needed
+        u = np.zeros((B, n))
+        u[:, 1] = d[:, 0] / diag[:, 0]
+        return u
     c = np.empty((B, n - 3))
     c[:, 0] = upper[:, 0] / diag[:, 0]
     d[:, 0] = d[:, 0] / diag[:, 0]

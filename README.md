@@ -42,23 +42,33 @@ Part 2: [PINNs vs Neural Operators](https://medium.com/@diogo-ribeiro-1975/pinns
 ## Run it
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements.txt -c requirements-lock.txt
 pip install -e .
 python run_experiment.py --quick    # smoke test, about two minutes, writes results-quick/
 python run_experiment.py            # main run, about an hour on two CPU cores
 python check_reference.py           # quadrature check on the exact solution
 python baselines.py                 # both solver variants on the common 129-point grid
-python ablation_log_input.py        # log a against a as the operators' input (~4 min)
-python timing.py                    # every method timed under one protocol
+python ablation_log_input.py        # log a against a as the operators' input (~3 min)
+python fno_padding_check.py         # how the FNO's padding depends on the grid
+python timing.py                    # every method timed under one protocol (~5 min)
 python make_figures.py              # figures/ and results/derived.json
 ```
 
 The main run writes `results/results.json`, `results/arrays.npz` (the arrays the
-figures draw) and `results/models/` (the trained operators). The other scripts read
-those and write `reference_check.json`, `baselines.json`, `ablation_log_input.json`,
-`timing.json` and `derived.json` next to them. The committed `results/` and `figures/`
-are the ones the article quotes. Accuracy results are deterministic with the pinned
-versions on the same hardware; timings are not.
+figures draw), `results/models/` (the trained operators) and `results/run.log`. The
+other scripts read those and write `reference_check.json`, `baselines.json`,
+`ablation_log_input.json`, `fno_padding_check.json`, `timing.json` and `derived.json` next
+to them. Each takes
+`--results DIR`, so the whole pipeline also runs on `results-quick/`; `--quick` never
+writes into `results/`. The committed `results/` and `figures/` are the ones the
+article quotes.
+
+Accuracy results are reproducible bit for bit with the pinned versions on the same CPU
+model; on other hardware the network-based numbers can differ in the last digits.
+Timings are machine-dependent: `timing.py` measures inference and training again on
+the machine it runs on, so every time in `timing.json` comes from one machine. (The
+inference timings that older runs recorded in `results.json` are superseded by
+`timing.json`.)
 
 The whole pipeline can also be run on GitHub: **Actions → Reproduce results → Run
 workflow** reruns everything from scratch and uploads the results as an artifact.
@@ -68,6 +78,7 @@ workflow** reruns everything from scratch and uploads the results as an artifact
 ```
 elliptic1d/
   config.py      every setting, in one frozen dataclass
+  runs.py        loading a run's results and regenerating its fields
   fields.py      random coefficient families (smooth Gaussian, piecewise constant)
   solver.py      exact reference solution; finite-volume solver (NumPy, and JAX for timing)
   nets.py        MLP and initialisation
@@ -80,6 +91,7 @@ run_experiment.py        the main experiment
 check_reference.py       how exact is the exact solution
 baselines.py             solver variants on the common grid, matching grid sizes
 ablation_log_input.py    log a vs a as operator input
+fno_padding_check.py     how the FNO's first layer depends on the grid
 timing.py                one timing protocol for every method
 make_figures.py          figures and derived numbers
 tools/mkdocs_hooks.py    builds the documentation's result tables from results/*.json
@@ -102,17 +114,19 @@ tests/                   solver accuracy and order, models, repository consisten
 - **Everything is scored on one grid.** The learned models and the solver are all
   evaluated on the same 129-point grid; a solver run on a coarser grid is interpolated
   linearly onto it (`baselines.py`).
-- **Timing starts from the same input for everyone**: a at the grid points. Each
-  method's own preprocessing is inside the timed region; generating the synthetic fields
-  is not. For the solver and the DeepONet the faster of two reasonable implementations
-  is reported, including a DeepONet whose trunk is evaluated once and cached (`timing.py`).
+- **Timing starts from the same input for everyone**: a NumPy array of a at the grid
+  points, and ends with a NumPy array of u. Conversions and each method's own
+  preprocessing are inside the timed region; generating the synthetic fields is not. For
+  the solver and the DeepONet the faster of two reasonable implementations is reported,
+  including a DeepONet whose trunk is evaluated once and cached (`timing.py`).
 - **Budgets were calibrated, not searched.** A handful of calibration runs per model on
   the training family; nothing was tuned on the shifted families.
 
 ## Contributing and releases
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). CI runs the linter, the tests and a quick run of
-the pipeline on every pull request; releases are made by the **Release** workflow.
+See [CONTRIBUTING.md](CONTRIBUTING.md). CI runs the linter, the tests and the whole
+pipeline on a quick run on every push to `main` and every pull request; releases are made
+by the **Release** workflow.
 
 ## Citation
 

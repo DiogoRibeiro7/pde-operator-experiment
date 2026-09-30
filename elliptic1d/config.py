@@ -101,3 +101,21 @@ def quick(cfg: Config) -> Config:
         fno_steps=250,
         fd_convergence_grids=(9, 17, 33, 65, 129),
     )
+
+
+def from_dict(d: dict) -> Config:
+    """Rebuild a Config from its JSON form (results.json["config"])."""
+    def fam(x: dict) -> FieldFamily:
+        return FieldFamily(**x)
+
+    kw = {}
+    for k, v in d.items():
+        if k == "train_family":
+            kw[k] = fam(v)
+        elif k == "shift_families":
+            kw[k] = tuple(fam(x) for x in v)
+        elif isinstance(v, list):
+            kw[k] = tuple(v)
+        else:
+            kw[k] = v
+    return Config(**kw)

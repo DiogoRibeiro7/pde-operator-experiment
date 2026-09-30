@@ -1,10 +1,11 @@
 name: Reproduce results
 
-# Runs the complete pipeline from scratch on a GitHub runner and uploads the
-# results and figures as an artifact. Nothing is committed: compare the
-# artifact with results/ and figures/, and open a pull request if they should
-# be replaced. Timings depend on the machine and will differ from the
-# committed ones; accuracy numbers should not.
+# Runs the pipeline from scratch on a GitHub runner and uploads the results
+# and figures as an artifact. Nothing is committed: compare the artifact with
+# results/ and figures/, and open a pull request if they should be replaced.
+# Timings depend on the machine. Accuracy numbers are reproducible bit for bit
+# only on the same CPU model and software versions; on a runner, the
+# network-based ones can differ slightly in the last digits.
 
 on:
   workflow_dispatch:
@@ -19,31 +20,34 @@ permissions:
 
 jobs:
   reproduce:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 300
+    env:
+      RESULTS: ${{ inputs.quick && 'results-quick' || 'results' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: pip
-      - name: Install
+          cache-dependency-path: |
+            requirements.txt
+            pyproject.toml
+      - name: Install (every package pinned)
         run: |
-          pip install -r requirements.txt
-          pip install -e .
-      - name: Quick run
-        if: inputs.quick
-        run: python run_experiment.py --quick
-      - name: Full pipeline
-        if: ${{ !inputs.quick }}
+          pip install -r requirements.txt -c requirements-lock.txt
+          pip install -e . -c requirements-lock.txt
+      - name: Main run
+        run: python run_experiment.py ${{ inputs.quick && '--quick' || '' }}
+      - name: Downstream scripts
         run: |
-          python run_experiment.py
-          python check_reference.py
-          python baselines.py
-          python ablation_log_input.py
-          python timing.py
-          python make_figures.py
-      - name: Compare with the committed accuracy results
+          python check_reference.py --results "$RESULTS"
+          python baselines.py --results "$RESULTS"
+          python ablation_log_input.py --results "$RESULTS"
+          python fno_padding_check.py --results "$RESULTS"
+          python timing.py --results "$RESULTS"
+          python make_figures.py --results "$RESULTS"
+      - name: Compare with the committed results
         if: ${{ !inputs.quick }}
         run: |
           python - <<'EOF'
@@ -57,11 +61,19 @@ jobs:
               for k in keys:
                   print(f"{name}:{k}\n  committed: {old.get(k)}\n  this run:  {new.get(k)}")
           EOF
-      - uses: actions/upload-artifact@v4
+      - name: Upload the quick results
+        if: ${{ always() && inputs.quick }}
+        uses: actions/upload-artifact@v4
         with:
-          name: reproduced-${{ inputs.quick && 'quick' || 'full' }}-${{ github.sha }}
+          name: reproduced-quick-${{ github.sha }}
+          path: results-quick
+          if-no-files-found: ignore
+      - name: Upload the full results
+        if: ${{ always() && !inputs.quick }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: reproduced-full-${{ github.sha }}
           path: |
             results
-            results-quick
             figures
           if-no-files-found: ignore

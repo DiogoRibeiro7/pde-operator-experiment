@@ -1,14 +1,18 @@
-"""MkDocs hooks: bring the figures into the site and build the result tables from the result files.
+"""MkDocs hooks: bring the figures into the site and fill in result tables and numbers.
 
-The site never carries hand-copied numbers. Every table marked
-<!-- results:NAME --> in a page is generated here from results/*.json at build
-time, so the site always agrees with the committed results.
+Every table marked <!-- results:NAME --> and every number marked
+<!-- value:NAME --> in a page is generated here from results/*.json (and the
+citation from pyproject.toml and CITATION.cff) at build time, so the site
+agrees with the committed results and metadata without hand-copied numbers.
 """
 
 from __future__ import annotations
 
 import json
+import math
+import re
 import shutil
+import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -54,13 +58,17 @@ def accuracy_table() -> str:
     return table(["Method"] + [FAMILY_LABEL[f] for f in FAMILIES], rows)
 
 
+def count(v) -> str:
+    return "n/a" if v is None else str(v)
+
+
 def matching_table() -> str:
-    b, d = load("baselines.json"), load("derived.json")
+    b = load("baselines.json")
     m = b["model_mean_error_train"]
     rows = []
     for k, label in (("fno", "FNO"), ("deeponet", "DeepONet")):
-        rows.append([label, sci(m[k]), str(b["matching_n"]["nodal"][k]), str(b["matching_n"]["cell"][k]),
-                     f"{d['matching_n_at_solver_nodes_cell'][k]:.0f}"])
+        rows.append([label, sci(m[k]), count(b["matching_n"]["nodal"][k]), count(b["matching_n"]["cell"][k]),
+                     count(b["matching_n_at_own_nodes_cell"][k])])
     return table(["Operator", "Mean error", "Point-value solver", "Cell-average solver",
                   "Cell-average, scored at its own nodes"], rows)
 
@@ -75,7 +83,8 @@ def timing_table() -> str:
             ["FNO", us(best["fno_single"]), us(best["fno_batch"]), f"{t['offline_seconds']['fno']:.0f} s"],
             ["PINN, flux form", "—", "—", f"{t['pinn_seconds_per_field']['mixed']:.0f} s per field"],
             ["PINN, strong form", "—", "—", f"{t['pinn_seconds_per_field']['strong']:.0f} s per field"]]
-    return table(["Method", "One field per call", "Per field, 200 per call", "Training"], rows, "lrrr")
+    return table(["Method", "One field per call", f"Per field, {t['n_fields_batch']} per call", "Training"],
+                 rows, "lrrr")
 
 
 def sweep_table() -> str:
@@ -86,7 +95,42 @@ def sweep_table() -> str:
     return table(["Operator"] + [f"{n:,} pairs" for n in sizes] + ["Log-log slope"], rows)
 
 
-GENERATORS = {"accuracy": accuracy_table, "matching": matching_table, "timing": timing_table, "sweep": sweep_table}
+def bibtex() -> str:
+    version = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]["version"]
+    date = re.search(r'^date-released: "?(\d{4})', (ROOT / "CITATION.cff").read_text(), re.M)
+    year = date.group(1) if date else ""
+    return "\n".join([
+        "```bibtex",
+        "@software{ribeiro_pde_operator_experiment,",
+        "  author  = {Ribeiro, Diogo},",
+        "  title   = {pde-operator-experiment: a classical solver, a PINN, a DeepONet and an FNO",
+        "             on one elliptic PDE with an exact solution},",
+        f"  year    = {{{year}}},",
+        f"  version = {{{version}}},",
+        "  license = {Apache-2.0},",
+        "  url     = {https://github.com/DiogoRibeiro7/pde-operator-experiment}",
+        "}",
+        "```"])
+
+
+GENERATORS = {"accuracy": accuracy_table, "matching": matching_table, "timing": timing_table,
+              "sweep": sweep_table, "bibtex": bibtex}
+
+
+def values() -> dict[str, str]:
+    """Single numbers quoted in the prose."""
+    r, b, t = load("results.json"), load("baselines.json"), load("timing.json")
+    shift = r["operators"]["shift"]
+    op_mean = {k: {f: mean(x["mean"] for x in shift[k][f]) for f in FAMILIES} for k in ("deeponet", "fno")}
+    worst = max(op_mean[k][f] / op_mean[k]["train"] for k in op_mean for f in FAMILIES[1:])
+    pinn_fields = max(v for row in t["breakeven_fields_vs_pinn"].values() for v in row.values())
+    out = {"max_shift_factor": f"{worst:.0f}", "pinn_fields_ceiling": str(math.ceil(pinn_fields))}
+    for v in ("nodal", "cell"):
+        for k in ("fno", "deeponet"):
+            out[f"match_{v}_{k}"] = count(b["matching_n"][v][k])
+    for k in ("fno", "deeponet"):
+        out[f"match_own_{k}"] = count(b["matching_n_at_own_nodes_cell"][k])
+    return out
 
 
 def on_pre_build(config, **kwargs):
@@ -101,4 +145,13 @@ def on_page_markdown(markdown, page, config, files, **kwargs):
         marker = f"<!-- results:{name} -->"
         if marker in markdown:
             markdown = markdown.replace(marker, fn())
+    if "<!-- value:" in markdown:
+        vals = values()
+
+        def fill(m):
+            if m.group(1) not in vals:
+                raise KeyError(f"unknown value marker {m.group(1)!r} in {page.file.src_path}")
+            return vals[m.group(1)]
+
+        markdown = re.sub(r"<!-- value:([\w-]+) -->", fill, markdown)
     return markdown

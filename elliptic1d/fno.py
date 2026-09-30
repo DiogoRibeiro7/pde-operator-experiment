@@ -47,6 +47,10 @@ def apply(params: dict, a_grid, x):
     """a_grid: (B, n) standardised log a on a uniform grid; x: (n,) -> (B, n)."""
     B, n = a_grid.shape
     pad = padding(n)
+    n_coef = (n + pad) // 2 + 1
+    if params["layers"][0]["Rr"].shape[0] > n_coef:
+        raise ValueError(f"a {n}-point grid has only {n_coef} Fourier coefficients, fewer than the "
+                         f"{params['layers'][0]['Rr'].shape[0]} modes this FNO keeps")
     h = jnp.stack([a_grid, jnp.broadcast_to(x, a_grid.shape)], axis=-1)
     h = h @ params["lift"]["W"] + params["lift"]["b"]
     h = jnp.pad(h, ((0, 0), (0, pad), (0, 0)))

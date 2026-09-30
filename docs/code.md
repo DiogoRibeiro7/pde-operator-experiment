@@ -3,6 +3,7 @@
 ```text
 elliptic1d/
   config.py      every setting, in one frozen dataclass; quick() for smoke tests
+  runs.py        loading a run's results, rebuilding its config, regenerating its fields
   fields.py      random coefficient families: sample, evaluate a and log a anywhere
   solver.py      exact reference solution; finite-volume solver (cell averages or point values),
                  batched in NumPy and compiled in JAX; linear interpolation between grids
@@ -10,16 +11,17 @@ elliptic1d/
   train.py       one Adam loop for every model, plus L-BFGS for the PINN
   pinn.py        PINN for one field, strong form or flux form, exact boundary conditions
   deeponet.py    branch/trunk DeepONet
-  fno.py         1D Fourier neural operator with resolution-independent padding
+  fno.py         1D Fourier neural operator; padding is a fixed fraction of the grid
   operators.py   training and evaluating DeepONet and FNO on (a, u) pairs
-run_experiment.py        the main experiment: sweep, shift, resolution, PINNs, timing
+run_experiment.py        the main experiment: sweep, shift, resolution, PINNs, training times
 check_reference.py       how exact the exact solution is
 baselines.py             both solver variants on the common grid; matching grid sizes
 ablation_log_input.py    log a against a as the operators' input
-timing.py                one timing protocol for every method, with the saved models
+fno_padding_check.py     how the FNO's first spectral layer depends on the grid
+timing.py                one timing protocol for every method, training included, on one machine
 make_figures.py          figures and derived numbers
-tools/mkdocs_hooks.py    builds the site's result tables from results/*.json
-tests/                   solver accuracy and order, model shapes and training, repository consistency
+tools/mkdocs_hooks.py    builds the site's tables, quoted numbers and citation from the result files
+tests/                   solver accuracy and order, models, pipeline glue, repository consistency
 ```
 
 ## Using the pieces

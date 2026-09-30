@@ -1,0 +1,15 @@
+{
+ "note": "relative L2 difference from the output on 2049 points, on a common 65-point grid; first spectral layer of the first-run FNO; first training test field",
+ "input_as_in_the_model": {
+  "65": 0.07018303126096725,
+  "129": 0.03385382518172264,
+  "257": 0.015792207792401314,
+  "513": 0.0067686960101127625
+ },
+ "input_vanishing_at_the_ends": {
+  "65": 0.0010443257633596659,
+  "129": 0.0002569030912127346,
+  "257": 6.325487629510462e-05,
+  "513": 1.5050283764139749e-05
+ }
+}

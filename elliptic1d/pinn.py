@@ -100,6 +100,8 @@ def fit(cfg: Config, p_one: dict, seed: int, form: str = "auto"):
 
     form: "strong", "mixed", or "auto" (strong for smooth a, mixed for piecewise a).
     """
+    if form not in ("auto", "strong", "mixed"):
+        raise ValueError(f"form must be 'auto', 'strong' or 'mixed', not {form!r}")
     fa = field_arrays(p_one)
     if form == "auto":
         form = "mixed" if fa["kind"] == "piecewise" else "strong"

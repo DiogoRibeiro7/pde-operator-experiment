@@ -9,7 +9,7 @@
       "orcid": "0009-0001-2022-7072"
     }
   ],
-  "license": "Apache-2.0",
+  "license": "apache-2.0",
   "access_right": "open",
   "keywords": [
     "scientific machine learning",
@@ -23,12 +23,12 @@
   "related_identifiers": [
     {
       "identifier": "https://medium.com/@diogo-ribeiro-1975/beyond-pinns-a-map-of-modern-neural-network-paradigms-ee5956e2df51",
-      "relation": "isSupplementTo",
+      "relation": "references",
       "resource_type": "publication-other"
     },
     {
       "identifier": "https://medium.com/@diogo-ribeiro-1975/pinns-vs-neural-operators-09b3e9806d6e",
-      "relation": "isSupplementTo",
+      "relation": "references",
       "resource_type": "publication-other"
     }
   ]

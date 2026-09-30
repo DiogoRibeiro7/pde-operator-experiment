@@ -9,3 +9,8 @@ docs/figures/
 *.egg-info/
 build/
 dist/
+.mypy_cache/
+.ipynb_checkpoints/
+.DS_Store
+.coverage
+venv/

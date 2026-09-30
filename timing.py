@@ -1,38 +1,47 @@
 """Time every method under one protocol, using the trained models saved by run_experiment.py.
 
-    python timing.py      # a few minutes; run it on an otherwise idle machine
+    python timing.py                        # about seven minutes; run it on an otherwise idle machine
+    python timing.py --reuse-train-times    # under a minute: training times from results.json
+    python timing.py --results results-quick
 
-Protocol: every method receives the coefficient a at the 129 grid points (the
-DeepONet uses its 65 sensors, every other point) and returns u at the 129 grid
-points. Whatever each method needs to do to its input is inside the timed
-region: harmonic means for the solver, log and standardisation for the
-operators. Generating the random fields is not.
+Protocol: every method receives the same input, a NumPy float64 array holding
+the coefficient a at the grid points (the DeepONet reads its sensors, every
+other point), and returns a NumPy array with u at the grid points. Everything
+between the two is inside the timed region: the solver's harmonic means; the
+operators' conversion to float32, transfer, logarithm and standardisation, and
+the conversion of their output back to NumPy. Generating the random fields is
+not timed.
 
-For each method the faster of two reasonable implementations is reported, and
-both are kept in results/timing.json:
+For the solver and the DeepONet the faster of two reasonable implementations is
+reported, and both are kept in results/timing.json:
   solver    LAPACK dgtsv (SciPy) vs banded solve, one field; NumPy vs JAX Thomas, batched
   DeepONet  trunk recomputed on every call (as trained) vs trunk evaluated once for the
             fixed output grid and cached, which is the standard way to deploy it
+For reference, timing.json also records the operators with their input already
+on the device as float32 ("device_resident"), which is the most favourable case
+for them; the figures and the article use the common protocol.
+
+Training costs (labels, one DeepONet, one FNO, and PINNs on the first training
+fields) are measured again here by default, so that every time in timing.json
+comes from the same machine. The trained models are discarded.
 """
 
 from __future__ import annotations
 
+import argparse
 import json
-import os
 import pickle
 import time
+from pathlib import Path
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 from scipy.linalg.lapack import dgtsv
 
-from baselines import regenerate
-from elliptic1d import deeponet, fields, fno, nets, solver
-from elliptic1d.config import Config
+from elliptic1d import deeponet, fields, fno, nets, operators, pinn, runs, solver
 
-RES = "results"
-N = 129
+ROOT = Path(__file__).resolve().parent
 
 
 def median_time(fn, repeats: int) -> float:
@@ -45,55 +54,85 @@ def median_time(fn, repeats: int) -> float:
     return float(np.median(ts))
 
 
-def load(kind: str, seed: int = 0) -> dict:
-    with open(os.path.join(RES, "models", f"{kind}_seed{seed}.pkl"), "rb") as fh:
+def load_model(res_dir: Path, kind: str, seed: int = 0) -> dict:
+    with open(res_dir / "models" / f"{kind}_seed{seed}.pkl", "rb") as fh:
         m = pickle.load(fh)
     m["params"] = jax.tree_util.tree_map(jnp.asarray, m["params"])
     return m
 
 
-def fd_dgtsv(a: np.ndarray) -> np.ndarray:
+def fd_dgtsv(a: np.ndarray, f: float = 1.0) -> np.ndarray:
     ah = 2.0 * a[:-1] * a[1:] / (a[:-1] + a[1:])
     h2 = (1.0 / (a.size - 1)) ** 2
     diag = (ah[:-1] + ah[1:]) / h2
     off = -ah[1:-1] / h2
     u = np.zeros(a.size)
-    u[1:-1] = dgtsv(off, diag, off, np.ones(a.size - 2))[3]
+    u[1:-1] = dgtsv(off, diag, off, np.full(a.size - 2, f))[3]
     return u
 
 
-def fd_banded(a: np.ndarray) -> np.ndarray:
-    return solver.fd_solve_one(solver.nodal_harmonic_a(a))
+def fd_banded(a: np.ndarray, f: float = 1.0) -> np.ndarray:
+    return solver.fd_solve_one(solver.nodal_harmonic_a(a), f)
+
+
+def training_times(cfg, pool: dict, tests: dict, n_pinn: int) -> dict:
+    """Wall-clock training cost on this machine, compilation included, as in run_experiment.py."""
+    x = solver.grid(cfg.n_grid)
+    t0 = time.perf_counter()
+    u_pool = solver.fd(pool, cfg.n_grid, cfg.f_const)
+    out = {"source": "measured by timing.py on this machine",
+           "fd_labels_seconds_per_instance": (time.perf_counter() - t0) / runs.pool_size(cfg)}
+    idx = np.sort(np.random.default_rng(1000).choice(runs.pool_size(cfg), cfg.n_train, replace=False))
+    p_tr = fields.take(pool, idx)
+    for kind in ("deeponet", "fno"):
+        op = operators.fit(kind, cfg, p_tr, u_pool[idx], x, seed=int(kind == "fno"))
+        out[f"{kind}_train_seconds"] = [op.info["seconds"]]
+    for form in ("strong", "mixed"):
+        out[f"pinn_{form}_train_seconds_train_family"] = [
+            pinn.fit(cfg, fields.take(tests["train"], i), seed=7 + i, form=form)[1]["seconds"] for i in range(n_pinn)]
+    return out
 
 
 def main() -> None:
-    cfg = Config()
-    p = regenerate(cfg)["train"]
+    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    ap.add_argument("--results", default=str(ROOT / "results"), help="folder written by run_experiment.py")
+    ap.add_argument("--reuse-train-times", action="store_true",
+                    help="take training times from results.json instead of measuring them on this machine")
+    ap.add_argument("--pinn-fields", type=int, default=2, help="PINNs per form to time (default 2)")
+    args = ap.parse_args()
+    res_dir = Path(args.results)
+    r, cfg = runs.load(res_dir)
+    N, f = cfg.n_grid, cfg.f_const
+    pool, tests = runs.draws(cfg)
+    runs.check_tests(tests, res_dir, N)
+    p = tests["train"]
     x = solver.grid(N)
-    a = fields.a(p, x)                                   # (200, 129) float64: the common input
-    a32 = jnp.asarray(a, jnp.float32)
-    a1_np, a1 = a[0], a32[:1]
+    a = fields.a(p, x)                                   # (n_test, N) float64: the common input
+    a1 = a[:1]                                           # one field, same dtype and container
     xs = jnp.asarray(x, jnp.float32)
-    sens = np.arange(0, N, (N - 1) // (cfg.n_sensors - 1))
+    sens = np.linspace(0, N - 1, cfg.n_sensors).round().astype(int)
     assert np.allclose(x[sens], deeponet.sensors(cfg))
-    T: dict = {"protocol": "input: a at the 129 grid points (DeepONet: its 65 sensors); output: u at the "
-                           "129 grid points; input preprocessing inside the timed region; field generation "
-                           "excluded; single = one field per call, batch = 200 fields per call (per-field time)",
-               "n_fields_batch": int(a.shape[0])}
+    n_b = a.shape[0]
+    T: dict = {"protocol": "input: NumPy float64 a at the grid points (DeepONet: its sensors); output: NumPy u "
+                           "at the grid points; all conversion and preprocessing inside the timed region; field "
+                           "generation excluded; single = one field per call, batch = all test fields per call "
+                           "(per-field time)",
+               "n_grid": N, "n_fields_batch": int(n_b), "environment": runs.environment()}
 
     # ---------------------------------------------------------------- solver
-    assert np.allclose(fd_dgtsv(a1_np), fd_banded(a1_np))
-    T["fd_single_dgtsv"] = median_time(lambda: fd_dgtsv(a1_np), 2000)
-    T["fd_single_banded"] = median_time(lambda: fd_banded(a1_np), 2000)
+    assert np.allclose(fd_dgtsv(a[0], f), fd_banded(a[0], f))
+    T["fd_single_dgtsv"] = median_time(lambda: fd_dgtsv(a[0], f), 2000)
+    T["fd_single_banded"] = median_time(lambda: fd_banded(a[0], f), 2000)
     for n_big in (257, 513):                               # finer grids, for the PINN comparison
         a_big = fields.a(fields.take(p, 0), solver.grid(n_big))[0]
-        T[f"fd_single_dgtsv_{n_big}"] = median_time(lambda: fd_dgtsv(a_big), 2000)
-    T["fd_batch_numpy"] = median_time(lambda: solver.fd_solve_batch(solver.nodal_harmonic_a(a)), 50) / a.shape[0]
-    thomas = jax.jit(lambda aa: solver._thomas_jax(2.0 * aa[:, :-1] * aa[:, 1:] / (aa[:, :-1] + aa[:, 1:]), 1.0))
-    T["fd_batch_jax"] = median_time(lambda: jax.block_until_ready(thomas(a32)), 200) / a.shape[0]
+        T[f"fd_single_dgtsv_{n_big}"] = median_time(lambda: fd_dgtsv(a_big, f), 2000)
+    T["fd_batch_numpy"] = median_time(lambda: solver.fd_solve_batch(solver.nodal_harmonic_a(a), f), 50) / n_b
+    thomas = jax.jit(lambda aa: solver._thomas_jax(2.0 * aa[:, :-1] * aa[:, 1:] / (aa[:, :-1] + aa[:, 1:]), f))
+    assert np.allclose(np.asarray(thomas(a)), solver.fd_solve_batch(solver.nodal_harmonic_a(a), f), rtol=1e-3)
+    T["fd_batch_jax"] = median_time(lambda: np.asarray(thomas(a)), 200) / n_b
 
     # -------------------------------------------------------------- DeepONet
-    m = load("deeponet")
+    m = load_model(res_dir, "deeponet")
     P, sc = m["params"], m["scaler"]
     mu, sd, us = sc["g_mean"], sc["g_std"], sc["u_scale"]
 
@@ -103,7 +142,7 @@ def main() -> None:
         return deeponet.apply(P, g, xs) * us
 
     basis = xs[:, None] * (1.0 - xs[:, None]) * nets.mlp_apply(P["trunk"], (2.0 * xs - 1.0)[:, None],
-                                                                final_act=jnp.tanh)      # (129, p), once
+                                                                final_act=jnp.tanh)      # (N, p), once
     bias = xs * (1.0 - xs) * P["b0"]
 
     @jax.jit
@@ -111,23 +150,33 @@ def main() -> None:
         g = (jnp.log(aa[:, sens]) - mu) / sd
         return (nets.mlp_apply(P["branch"], g) @ basis.T + bias) * us
 
-    assert np.allclose(np.asarray(don_full(a32)), np.asarray(don_cached(a32)), rtol=1e-4, atol=1e-6)
-    T["deeponet_single_full"] = median_time(lambda: jax.block_until_ready(don_full(a1)), 2000)
-    T["deeponet_single_cached_trunk"] = median_time(lambda: jax.block_until_ready(don_cached(a1)), 2000)
-    T["deeponet_batch_full"] = median_time(lambda: jax.block_until_ready(don_full(a32)), 200) / a.shape[0]
-    T["deeponet_batch_cached_trunk"] = median_time(lambda: jax.block_until_ready(don_cached(a32)), 200) / a.shape[0]
+    assert np.allclose(np.asarray(don_full(a)), np.asarray(don_cached(a)), rtol=1e-4, atol=1e-6)
+    T["deeponet_single_full"] = median_time(lambda: np.asarray(don_full(a1)), 2000)
+    T["deeponet_single_cached_trunk"] = median_time(lambda: np.asarray(don_cached(a1)), 2000)
+    T["deeponet_batch_full"] = median_time(lambda: np.asarray(don_full(a)), 200) / n_b
+    T["deeponet_batch_cached_trunk"] = median_time(lambda: np.asarray(don_cached(a)), 200) / n_b
 
     # ------------------------------------------------------------------- FNO
-    m = load("fno")
-    P, sc = m["params"], m["scaler"]
-    mu, sd, us = sc["g_mean"], sc["g_std"], sc["u_scale"]
+    m = load_model(res_dir, "fno")
+    Pf, scf = m["params"], m["scaler"]
 
     @jax.jit
     def fno_run(aa):
-        return fno.apply(P, (jnp.log(aa) - mu) / sd, xs) * us
+        return fno.apply(Pf, (jnp.log(aa) - scf["g_mean"]) / scf["g_std"], xs) * scf["u_scale"]
 
-    T["fno_single"] = median_time(lambda: jax.block_until_ready(fno_run(a1)), 1000)
-    T["fno_batch"] = median_time(lambda: jax.block_until_ready(fno_run(a32)), 50) / a.shape[0]
+    T["fno_single"] = median_time(lambda: np.asarray(fno_run(a1)), 1000)
+    T["fno_batch"] = median_time(lambda: np.asarray(fno_run(a)), 50) / n_b
+
+    # ------------------- reference only: operators with their input already on the device
+    a1_dev, a_dev = jnp.asarray(a1, jnp.float32), jnp.asarray(a, jnp.float32)
+    T["device_resident"] = {
+        "note": "input already a float32 JAX array, output left on the device; not the common protocol",
+        "deeponet_single_cached_trunk": median_time(lambda: jax.block_until_ready(don_cached(a1_dev)), 2000),
+        "deeponet_batch_cached_trunk": median_time(lambda: jax.block_until_ready(don_cached(a_dev)), 200) / n_b,
+        "fno_single": median_time(lambda: jax.block_until_ready(fno_run(a1_dev)), 1000),
+        "fno_batch": median_time(lambda: jax.block_until_ready(fno_run(a_dev)), 50) / n_b,
+        "fd_batch_jax": median_time(lambda: jax.block_until_ready(thomas(a_dev)), 200) / n_b,
+    }
 
     # --------------------------------------- arithmetic per field (XLA's own count)
     def flops(fn, arg):
@@ -135,7 +184,7 @@ def main() -> None:
         ca = ca[0] if isinstance(ca, (list, tuple)) else ca
         return float(ca.get("flops", float("nan")))
 
-    T["flops_per_field"] = {"deeponet_cached_trunk": flops(don_cached, a1), "fno": flops(fno_run, a1),
+    T["flops_per_field"] = {"deeponet_cached_trunk": flops(don_cached, a1_dev), "fno": flops(fno_run, a1_dev),
                             "fd_tridiagonal_estimate": 8.0 * (N - 2)}
 
     # ---------------------------------------------------------- best of each
@@ -147,23 +196,26 @@ def main() -> None:
         "fno_single": T["fno_single"],
         "fno_batch": T["fno_batch"],
     }
-    r = json.load(open(os.path.join(RES, "results.json")))
-    n_train = r["config"]["n_train"]
-    label = r["timing"]["fd_labels_seconds_per_instance"] * n_train
-    offline = {k: float(np.mean(r["timing"][f"{k}_train_seconds"])) + label for k in ("deeponet", "fno")}
-    pinn = {f: float(np.mean(r["timing"][f"pinn_{f}_train_seconds_train_family"])) for f in ("strong", "mixed")}
+    if args.reuse_train_times:
+        tr = {"source": "results.json (the main run's machine)", **r["timing"]}
+    else:
+        tr = training_times(cfg, pool, tests, min(args.pinn_fields, cfg.n_pinn_instances))
+    T["training"] = tr
+    label = tr["fd_labels_seconds_per_instance"] * cfg.n_train
+    offline = {k: float(np.mean(tr[f"{k}_train_seconds"])) + label for k in ("deeponet", "fno")}
+    pinn_s = {fm: float(np.mean(tr[f"pinn_{fm}_train_seconds_train_family"])) for fm in ("strong", "mixed")}
     B = T["best"]
     T["offline_seconds"] = offline
-    T["pinn_seconds_per_field"] = pinn
+    T["pinn_seconds_per_field"] = pinn_s
     T["breakeven_queries_vs_fd"] = {
         mode: {k: (offline[k] / (B[f"fd_{mode}"] - B[f"{k}_{mode}"]) if B[f"fd_{mode}"] > B[f"{k}_{mode}"] else None)
                for k in ("deeponet", "fno")} for mode in ("single", "batch")}
-    T["breakeven_fields_vs_pinn"] = {f: {k: offline[k] / pinn[f] for k in ("deeponet", "fno")} for f in pinn}
+    T["breakeven_fields_vs_pinn"] = {fm: {k: offline[k] / pinn_s[fm] for k in ("deeponet", "fno")} for fm in pinn_s}
     q = 1e6
     T["million_queries_seconds_single"] = {
         "fd": q * B["fd_single"], **{k: offline[k] + q * B[f"{k}_single"] for k in ("deeponet", "fno")},
-        **{f"pinn_{f}": q * s for f, s in pinn.items()}}
-    with open(os.path.join(RES, "timing.json"), "w") as fh:
+        **{f"pinn_{fm}": q * s for fm, s in pinn_s.items()}}
+    with open(res_dir / "timing.json", "w") as fh:
         json.dump(T, fh, indent=1)
     print(json.dumps(T, indent=1))
 

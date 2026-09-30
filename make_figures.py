@@ -1,16 +1,21 @@
-"""Draw the article's figures from results/results.json and results/arrays.npz.
+"""Draw the article's figures from the files in results/.
 
-    python make_figures.py
+    python make_figures.py                          # reads results/, writes figures/
+    python make_figures.py --results results-quick  # writes results-quick/figures/
 
-Also writes results/derived.json: the few numbers that are computed from the
-results rather than read off them (crossing points, fitted slopes,
-break-even query counts), so the article can cite them too.
+Reads results.json and arrays.npz (run_experiment.py), baselines.json
+(baselines.py) and timing.json (timing.py). Also writes derived.json into the
+results folder: the few numbers computed from the results rather than read off
+them (convergence slopes, training-set slopes, error-versus-contrast
+statistics), so the article can cite them too.
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
+from pathlib import Path
 
 import matplotlib
 
@@ -18,7 +23,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-RES, FIG = "results", "figures"
+ROOT = Path(__file__).resolve().parent
+RES, FIG = str(ROOT / "results"), str(ROOT / "figures")      # set in main()
 
 INK, INK2, MUTED, GRID = "#0b0b0b", "#52514e", "#8a8984", "#e6e5e0"
 C = {"fd": "#3d3c39", "pinn": "#eb6834", "deeponet": "#1baf7a", "fno": "#2a78d6"}
@@ -71,17 +77,15 @@ def seed_mean(rows: list[dict], key: str) -> float:
     return float(np.mean([r[key] for r in rows]))
 
 
-def loglog_cross(xs, ys, level):
-    """First x where the piecewise log-log interpolant of ys falls below `level`."""
-    lx, ly, ll = np.log(xs), np.log(ys), np.log(level)
-    for i in range(len(xs) - 1):
-        if ly[i] >= ll >= ly[i + 1]:
-            t = (ll - ly[i]) / (ly[i + 1] - ly[i])
-            return float(np.exp(lx[i] + t * (lx[i + 1] - lx[i])))
-    return None
-
-
 def main() -> None:
+    global RES, FIG
+    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    ap.add_argument("--results", default=str(ROOT / "results"), help="folder with the result files")
+    ap.add_argument("--figures", default=None,
+                    help="output folder (default: figures/ for results/, otherwise <results>/figures)")
+    args = ap.parse_args()
+    RES = os.path.abspath(args.results)
+    FIG = args.figures or (str(ROOT / "figures") if Path(RES) == ROOT / "results" else os.path.join(RES, "figures"))
     os.makedirs(FIG, exist_ok=True)
     r = json.load(open(os.path.join(RES, "results.json")))
     A = np.load(os.path.join(RES, "arrays.npz"))
@@ -105,8 +109,7 @@ def main() -> None:
         ue = A[f"exact_{fam}"][0]
         curves = [("fd", A[f"fd_{fam}"][0], "-", None)]
         if f"pinn_strong_{fam}" in A.files:
-            curves.append(("pinn", A[f"pinn_strong_{fam}"][0] if A[f"pinn_strong_{fam}"].ndim > 1
-                           else A[f"pinn_strong_{fam}"], "--", "strong form"))
+            curves.append(("pinn", A[f"pinn_strong_{fam}"], "--", "strong form"))
         curves.append(("pinn", A[f"pinn_mixed_{fam}"], "-", "flux form"))
         curves += [("deeponet", A[f"pred_deeponet_{fam}"][0], "-", None),
                    ("fno", A[f"pred_fno_{fam}"][0], "-", None)]
@@ -140,12 +143,6 @@ def main() -> None:
         keep = nf >= 33
         derived["fd_convergence_slope_by_family"][fam] = float(
             np.polyfit(np.log(1.0 / (nf[keep] - 1)), np.log(ef[keep]), 1)[0])
-    # for comparison only: matching when the solver is scored at its own nodes (cell averages)
-    cf = r["solver"]["convergence"]["train"]
-    nf = np.array(sorted(int(k) for k in cf))
-    ef = np.array([cf[str(n)]["mean"] for n in nf])
-    derived["matching_n_at_solver_nodes_cell"] = {
-        k: loglog_cross(nf, ef, seed_mean(op["shift"][k]["train"], "mean")) for k in ("deeponet", "fno")}
     # matching, on the common 129-point grid (baselines.py)
     bl = json.load(open(os.path.join(RES, "baselines.json")))
     ns = np.array(bl["convergence"]["n"])

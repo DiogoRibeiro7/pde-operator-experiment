@@ -50,5 +50,5 @@ Both operators learn from 1,000 pairs \((a, u)\) with a relative \(L^2\) loss (4
 1. **Same test fields.** 200 fields per family, drawn once from a fixed seed.
 2. **Same grid.** Every method is scored on the 129-point grid; a solver run on a coarser grid is carried onto it by linear interpolation.
 3. **Same information.** The point-value solver sees only what the FNO sees.
-4. **Same clock.** Every method is timed from \(a\) at the grid points to \(u\) at the grid points, preprocessing included, on the same machine; for the solver and the DeepONet the faster of two reasonable implementations is reported.
+4. **Same clock.** Every method is timed from the same NumPy array of \(a\) at the grid points to a NumPy array of \(u\) at the grid points, conversions and preprocessing included, with training times measured on the same machine; for the solver and the DeepONet the faster of two reasonable implementations is reported.
 5. **No tuning on the test families.** Training budgets were set with a few calibration runs on the training family only; there was no hyperparameter search for any method.

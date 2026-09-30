@@ -2,11 +2,13 @@
 
 import numpy as np
 import pytest
+from scipy.integrate import quad
 
 from elliptic1d import fields, solver
 from elliptic1d.config import SHIFTS, TRAIN
 
 FAMILIES = (TRAIN,) + SHIFTS
+NAMES = [f.name for f in FAMILIES]
 
 
 def rel_l2(pred, ref):
@@ -35,7 +37,7 @@ def test_take_and_size(draws):
     np.testing.assert_allclose(fields.a(fields.take(p, 3), x)[0], fields.a(p, x)[3])
 
 
-@pytest.mark.parametrize("name", [f.name for f in FAMILIES])
+@pytest.mark.parametrize("name", NAMES)
 def test_exact_solution_satisfies_boundary_conditions(draws, name):
     u = solver.exact(draws[name], 129, n_fine=4097)
     np.testing.assert_allclose(u[:, 0], 0.0, atol=1e-14)
@@ -50,7 +52,7 @@ def test_exact_solution_for_constant_coefficient():
     np.testing.assert_allclose(solver.exact(p, 65)[0], x * (1 - x) / 2, atol=1e-15)
 
 
-@pytest.mark.parametrize("name", [f.name for f in FAMILIES])
+@pytest.mark.parametrize("name", NAMES)
 def test_cell_average_scheme_is_second_order(draws, name):
     p = draws[name]
     errs = [rel_l2(solver.fd(p, n), solver.exact(p, n, n_fine=8193)).mean() for n in (65, 129, 257)]
@@ -79,3 +81,39 @@ def test_to_grid_is_identity_on_the_same_grid_and_exact_for_lines():
     np.testing.assert_allclose(solver.to_grid(u, 33), u)
     x = solver.grid(9)
     np.testing.assert_allclose(solver.to_grid((2 * x + 1)[None], 129)[0], 2 * solver.grid(129) + 1)
+
+
+@pytest.mark.parametrize("name", ["train", "rough", "high-contrast"])
+def test_exact_solution_matches_adaptive_quadrature(draws, name):
+    p = fields.take(draws[name], 0)
+    inv = lambda s: float(np.exp(-fields.log_a(p, np.array([s]))[0, 0]))  # noqa: E731
+    I0 = lambda x: quad(inv, 0, x, limit=200, epsabs=1e-13, epsrel=1e-12)[0]  # noqa: E731
+    I1 = lambda x: quad(lambda s: s * inv(s), 0, x, limit=200, epsabs=1e-13, epsrel=1e-12)[0]  # noqa: E731
+    C = I1(1.0) / I0(1.0)
+    x = solver.grid(9)
+    ref = np.array([C * I0(xi) - I1(xi) for xi in x])
+    np.testing.assert_allclose(solver.exact(p, 9), ref[None], rtol=1e-10, atol=1e-13)
+
+
+def test_exact_solution_scales_with_the_right_hand_side(draws):
+    for name in ("train", "piecewise"):
+        p = draws[name]
+        np.testing.assert_allclose(solver.exact(p, 33, n_fine=4097, f=2.5), 2.5 * solver.exact(p, 33, n_fine=4097))
+        rel = rel_l2(solver.fd(p, 129, 2.5), solver.exact(p, 129, n_fine=8193, f=2.5)).max()
+        assert rel < 1e-3
+
+
+def test_exact_solution_on_grids_that_do_not_nest(draws):
+    p = draws["train"]
+    u = solver.exact(p, 13)                        # 12 does not divide 32768: the fine grid is refined
+    assert u.shape == (8, 13) and np.all(np.isfinite(u))
+    rel = rel_l2(solver.fd(p, 13), u).mean()
+    assert rel < 5e-2
+
+
+def test_three_point_grid(draws):
+    ah = solver.cell_harmonic_a(draws["train"], 3)
+    u = solver.fd_solve_batch(ah)
+    np.testing.assert_allclose(u[:, 1], [solver.fd_solve_one(ah[i])[1] for i in range(ah.shape[0])])
+    with pytest.raises(ValueError):
+        solver.fd_solve_batch(ah[:, :1])

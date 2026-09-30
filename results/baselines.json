@@ -18,8 +18,8 @@
     "worst_over_mean": 3.7401085135593255,
     "spearman_with_contrast": 0.47969549238730974
    },
-   "deeponet_over_nodal_spearman_with_contrast": 0.27149328733218336,
-   "fno_over_nodal_spearman_with_contrast": 0.24533563339083478,
+   "deeponet_first_run_over_nodal_spearman_with_contrast": 0.27149328733218336,
+   "fno_first_run_over_nodal_spearman_with_contrast": 0.24533563339083478,
    "deeponet_first_run": {
     "worst_over_mean": 18.806181677449963,
     "spearman_with_contrast": 0.6511092777319434
@@ -46,8 +46,8 @@
     "worst_over_mean": 3.202056896935437,
     "spearman_with_contrast": 0.3118772969324234
    },
-   "deeponet_over_nodal_spearman_with_contrast": 0.21179329483237083,
-   "fno_over_nodal_spearman_with_contrast": 0.07866346658666468,
+   "deeponet_first_run_over_nodal_spearman_with_contrast": 0.21179329483237083,
+   "fno_first_run_over_nodal_spearman_with_contrast": 0.07866346658666468,
    "deeponet_first_run": {
     "worst_over_mean": 3.438671713198505,
     "spearman_with_contrast": 0.5024360609015226
@@ -74,8 +74,8 @@
     "worst_over_mean": 5.50871128640631,
     "spearman_with_contrast": 0.4535048376209406
    },
-   "deeponet_over_nodal_spearman_with_contrast": 0.3892567314182855,
-   "fno_over_nodal_spearman_with_contrast": 0.364323108077702,
+   "deeponet_first_run_over_nodal_spearman_with_contrast": 0.3892567314182855,
+   "fno_first_run_over_nodal_spearman_with_contrast": 0.364323108077702,
    "deeponet_first_run": {
     "worst_over_mean": 4.795503500365911,
     "spearman_with_contrast": 0.6749193729843248
@@ -102,8 +102,8 @@
     "worst_over_mean": 13.827079376089024,
     "spearman_with_contrast": 0.5196834920873022
    },
-   "deeponet_over_nodal_spearman_with_contrast": 0.13117077926948173,
-   "fno_over_nodal_spearman_with_contrast": 0.30128703217580444,
+   "deeponet_first_run_over_nodal_spearman_with_contrast": 0.13117077926948173,
+   "fno_first_run_over_nodal_spearman_with_contrast": 0.30128703217580444,
    "deeponet_first_run": {
     "worst_over_mean": 7.645868675350727,
     "spearman_with_contrast": 0.7624660616515413
@@ -3120,9 +3120,17 @@
    ]
   }
  },
- "convergence_slope_vs_h": {
-  "cell": 2.2350533033284394,
-  "nodal": 2.05749049210264
+ "convergence_slope_vs_h_nested": {
+  "grids": [
+   129,
+   257,
+   385,
+   513,
+   1025,
+   2049
+  ],
+  "cell": 2.0000254353291873,
+  "nodal": 2.0000187529852615
  },
  "model_mean_error_train": {
   "deeponet": 0.014310086392098935,
@@ -3147,6 +3155,10 @@
  "fd_on_pinn_fields_129": {
   "cell": 3.1904073933954375e-05,
   "nodal": 0.00013673996000561285
+ },
+ "matching_n_at_own_nodes_cell": {
+  "deeponet": 9,
+  "fno": 14
  },
  "order_at_own_nodes": {
   "train": {

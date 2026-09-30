@@ -2,17 +2,7 @@
 
 If you use the code or the results, please cite the repository. GitHub shows a *Cite this repository* button generated from `CITATION.cff`; the equivalent BibTeX is
 
-```bibtex
-@software{ribeiro_pde_operator_experiment,
-  author  = {Ribeiro, Diogo},
-  title   = {pde-operator-experiment: a classical solver, a PINN, a DeepONet and an FNO
-             on one elliptic PDE with an exact solution},
-  year    = {2026},
-  version = {1.0.0},
-  license = {Apache-2.0},
-  url     = {https://github.com/DiogoRibeiro7/pde-operator-experiment}
-}
-```
+<!-- results:bibtex -->
 
 Each release is archived on Zenodo with its own DOI once the repository is enabled there.
 

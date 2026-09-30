@@ -15,9 +15,20 @@ import numpy as np
 import optax
 
 
-def adam(loss_fn, params, steps: int, lr: float, seed: int, chunk: int = 250):
+def _check_steps(steps: int, chunk: int) -> int:
+    if steps < 0:
+        raise ValueError("steps must be non-negative")
     chunk = min(chunk, steps)
-    assert steps % chunk == 0, "steps must be a multiple of chunk"
+    if steps and steps % chunk:
+        raise ValueError(f"steps ({steps}) must be a multiple of the chunk size ({chunk})")
+    return chunk
+
+
+def adam(loss_fn, params, steps: int, lr: float, seed: int, chunk: int = 250):
+    """Adam with a cosine-decayed learning rate. The history holds the mean loss of each chunk."""
+    chunk = _check_steps(steps, chunk)
+    if steps == 0:
+        return params, {"seconds": 0.0, "compile_seconds_est": 0.0, "history": []}
     opt = optax.adam(optax.cosine_decay_schedule(lr, steps, alpha=1e-2))
     state = opt.init(params)
 
@@ -49,10 +60,12 @@ def adam(loss_fn, params, steps: int, lr: float, seed: int, chunk: int = 250):
 
 
 def lbfgs(loss_fn, params, steps: int, chunk: int = 100):
-    """Deterministic full-batch L-BFGS with a zoom line search (optax defaults)."""
+    """Deterministic full-batch L-BFGS with a zoom line search (optax defaults).
+
+    The history holds, for each chunk, the loss evaluated at the start of its last step."""
+    chunk = _check_steps(steps, chunk)
     if steps == 0:
         return params, {"seconds": 0.0, "history": []}
-    chunk = min(chunk, steps)
     opt = optax.lbfgs()
     state = opt.init(params)
     value_and_grad = optax.value_and_grad_from_state(loss_fn)

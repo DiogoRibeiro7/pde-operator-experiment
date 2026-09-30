@@ -23,7 +23,7 @@ def test_licence_agrees_everywhere():
     assert pyproject()["project"]["license"] == "Apache-2.0"
     assert "Apache License" in (ROOT / "LICENSE").read_text()
     assert re.search(r"^license: Apache-2\.0$", (ROOT / "CITATION.cff").read_text(), re.M)
-    assert json.loads((ROOT / ".zenodo.json").read_text())["license"] == "Apache-2.0"
+    assert json.loads((ROOT / ".zenodo.json").read_text())["license"].lower() == "apache-2.0"
 
 
 def test_contact_email_is_the_same_everywhere():
@@ -37,7 +37,7 @@ def test_contact_email_is_the_same_everywhere():
 
 def test_committed_results_are_complete():
     expected = ["results.json", "arrays.npz", "baselines.json", "timing.json", "derived.json",
-                "reference_check.json", "ablation_log_input.json"]
+                "reference_check.json", "ablation_log_input.json", "fno_padding_check.json"]
     for name in expected:
         assert (ROOT / "results" / name).is_file(), name
     r = json.loads((ROOT / "results" / "results.json").read_text())

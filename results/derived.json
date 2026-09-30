@@ -5,10 +5,6 @@
   "high-contrast": 2.0002505466007547,
   "piecewise": 1.9982039914889138
  },
- "matching_n_at_solver_nodes_cell": {
-  "deeponet": 8.705210694999609,
-  "fno": 13.091986860961454
- },
  "sweep": {
   "deeponet": {
    "sizes": [

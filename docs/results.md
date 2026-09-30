@@ -34,11 +34,11 @@ Mean error on the training family, averaged over three runs at each size.
 
 ## Cost
 
-Timed on a two-core CPU from \(a\) at the grid points to \(u\) at the grid points. Operator training includes generating the 1,000 training labels.
+Every method receives the same NumPy array holding \(a\) at the grid points and returns a NumPy array with \(u\) at the grid points; conversions and preprocessing are inside the timed region. All times, training included, were measured by `timing.py` on one two-core CPU. Operator training includes generating the training labels.
 
 <!-- results:timing -->
 
 ![Cost of many queries](figures/fig5_cost.png)
 
 !!! note "Timings are machine-dependent"
-    The accuracy results are deterministic on the same hardware and software versions. Timings are not: they move between runs and machines, although their order did not change in any run made for this study.
+    The accuracy results are reproducible bit for bit on the same CPU model and software versions; on other hardware the network-based numbers can differ in the last digits. Timings vary between runs and machines, although the order of the methods did not change in any run made for this study.

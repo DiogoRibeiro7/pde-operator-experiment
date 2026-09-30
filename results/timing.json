@@ -1,38 +1,74 @@
 {
- "protocol": "input: a at the 129 grid points (DeepONet: its 65 sensors); output: u at the 129 grid points; input preprocessing inside the timed region; field generation excluded; single = one field per call, batch = 200 fields per call (per-field time)",
+ "protocol": "input: NumPy float64 a at the grid points (DeepONet: its sensors); output: NumPy u at the grid points; all conversion and preprocessing inside the timed region; field generation excluded; single = one field per call, batch = all test fields per call (per-field time)",
+ "n_grid": 129,
  "n_fields_batch": 200,
- "fd_single_dgtsv": 1.1682500371534843e-05,
- "fd_single_banded": 4.108800021640491e-05,
- "fd_single_dgtsv_257": 2.265450075356057e-05,
- "fd_single_dgtsv_513": 2.2322999939206056e-05,
- "fd_batch_numpy": 7.973842498358863e-06,
- "fd_batch_jax": 1.2023599992971868e-06,
- "deeponet_single_full": 0.00017982450117415283,
- "deeponet_single_cached_trunk": 5.499549934029346e-05,
- "deeponet_batch_full": 3.4771475020534125e-06,
- "deeponet_batch_cached_trunk": 2.9429150026771823e-06,
- "fno_single": 0.00041855899962683907,
- "fno_batch": 0.00025123811249613934,
+ "environment": {
+  "python": "3.11.15",
+  "jax": "0.10.2",
+  "optax": "0.2.8",
+  "numpy": "2.4.4",
+  "scipy": "1.17.1",
+  "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+  "cpu_count": 2
+ },
+ "fd_single_dgtsv": 1.0230500038233004e-05,
+ "fd_single_banded": 3.300850016785262e-05,
+ "fd_single_dgtsv_257": 1.3735500033362769e-05,
+ "fd_single_dgtsv_513": 2.060999986497336e-05,
+ "fd_batch_numpy": 6.511927499559533e-06,
+ "fd_batch_jax": 7.911349996447825e-07,
+ "deeponet_single_full": 0.00015729450024082325,
+ "deeponet_single_cached_trunk": 4.2089999851668836e-05,
+ "deeponet_batch_full": 3.2168750010441727e-06,
+ "deeponet_batch_cached_trunk": 1.9547875001535432e-06,
+ "fno_single": 0.00031690700006947736,
+ "fno_batch": 0.00015830957750040398,
+ "device_resident": {
+  "note": "input already a float32 JAX array, output left on the device; not the common protocol",
+  "deeponet_single_cached_trunk": 3.6513499935608706e-05,
+  "deeponet_batch_cached_trunk": 2.2714174997418014e-06,
+  "fno_single": 0.00030202350012586976,
+  "fno_batch": 0.0001689908075013591,
+  "fd_batch_jax": 6.794274986532401e-07
+ },
  "flops_per_field": {
   "deeponet_cached_trunk": 115908.0,
   "fno": 4341445.0,
   "fd_tridiagonal_estimate": 1016.0
  },
  "best": {
-  "fd_single": 1.1682500371534843e-05,
-  "fd_batch": 1.2023599992971868e-06,
-  "deeponet_single": 5.499549934029346e-05,
-  "deeponet_batch": 2.9429150026771823e-06,
-  "fno_single": 0.00041855899962683907,
-  "fno_batch": 0.00025123811249613934
+  "fd_single": 1.0230500038233004e-05,
+  "fd_batch": 7.911349996447825e-07,
+  "deeponet_single": 4.2089999851668836e-05,
+  "deeponet_batch": 1.9547875001535432e-06,
+  "fno_single": 0.00031690700006947736,
+  "fno_batch": 0.00015830957750040398
+ },
+ "training": {
+  "source": "measured by timing.py on this machine",
+  "fd_labels_seconds_per_instance": 1.303666149988203e-05,
+  "deeponet_train_seconds": [
+   29.7237654620003
+  ],
+  "fno_train_seconds": [
+   60.40260669899999
+  ],
+  "pinn_strong_train_seconds_train_family": [
+   41.09421633300008,
+   39.979878832000395
+  ],
+  "pinn_mixed_train_seconds_train_family": [
+   36.07940633999988,
+   35.74798629199995
+  ]
  },
  "offline_seconds": {
-  "deeponet": 33.40984845183311,
-  "fno": 81.3343721621665
+  "deeponet": 29.736802123500183,
+  "fno": 60.41564336049987
  },
  "pinn_seconds_per_field": {
-  "strong": 56.39646917739992,
-  "mixed": 37.49967070820003
+  "strong": 40.537047582500236,
+  "mixed": 35.913696315999914
  },
  "breakeven_queries_vs_fd": {
   "single": {
@@ -46,19 +82,19 @@
  },
  "breakeven_fields_vs_pinn": {
   "strong": {
-   "deeponet": 0.5924102863024913,
-   "fno": 1.4421890829073407
+   "deeponet": 0.733570989919293,
+   "fno": 1.4903809468990827
   },
   "mixed": {
-   "deeponet": 0.8909371154698541,
-   "fno": 2.1689356366636354
+   "deeponet": 0.8280072834010165,
+   "fno": 1.6822452033037907
   }
  },
  "million_queries_seconds_single": {
-  "fd": 11.682500371534843,
-  "deeponet": 88.40534779212658,
-  "fno": 499.8933717890056,
-  "pinn_strong": 56396469.17739992,
-  "pinn_mixed": 37499670.70820003
+  "fd": 10.230500038233004,
+  "deeponet": 71.82680197516902,
+  "fno": 377.32264342997723,
+  "pinn_strong": 40537047.582500234,
+  "pinn_mixed": 35913696.31599992
  }
 }

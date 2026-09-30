@@ -7,10 +7,13 @@ collocation points, or on the fine grid used for the reference solution.
 Smooth family
     g(x) = sum_k s_k (xi_k cos(pi k x) + eta_k sin(pi k x)),  xi, eta ~ N(0, 1),
     s_k^2 proportional to exp(-(pi k ell)^2 / 2), normalised so Var g(x) = sigma^2.
-    The covariance is sum_k s_k^2 cos(pi k (x - x')): stationary, and close to
-    sigma^2 exp(-(x - x')^2 / (2 ell^2)). Frequencies are multiples of pi, not
-    2 pi, so realisations are not periodic on [0, 1] and an FFT-based model
-    gets no free pass from periodicity.
+    The covariance is sum_k s_k^2 cos(pi k (x - x')): stationary, with a
+    Gaussian-shaped spectrum. It is not the squared-exponential covariance,
+    because the series has no constant (k = 0) term: for ell = 0.15 the
+    correlation is about 0.52 at lag ell and settles near -0.23 beyond lag 0.5.
+    So ell is a spectral length scale, not a correlation length. Frequencies are
+    multiples of pi, not 2 pi, so realisations are not periodic on [0, 1] and an
+    FFT-based model gets no free pass from periodicity.
 
 Piecewise family
     g is constant on the intervals cut by n_pieces - 1 sorted uniform points,
