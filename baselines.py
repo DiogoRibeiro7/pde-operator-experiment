@@ -7,11 +7,17 @@ run_experiment.py measures the finite-difference error at the solver's own
 nodes. The learned models are scored on the 129-point grid. This script puts
 every method on that common grid (the solver's nodal solution is carried onto
 it by piecewise-linear interpolation), and adds a second solver variant that
-sees only point values of a, exactly the information the operators get:
+is given only point values of a at its own grid points, the kind of input the
+operators get:
 
   cell   a_{i+1/2} = harmonic mean of a over the cell (as in run_experiment.py);
          uses a between the nodes (4-point Gauss or exact integrals)
   nodal  a_{i+1/2} = harmonic mean of a(x_i) and a(x_{i+1}); point values only
+
+A point-value solver on, say, 27 points reads a at 27 points, most of which are
+not among the FNO's 129. `matching_n_nested` therefore also asks the stricter
+question: which grids that are subsets of the FNO's grid (5, 9, 17, 33, 65)
+match each operator.
 
 It regenerates the test fields from the run's configuration and checks them
 against the saved arrays before using them.
@@ -117,6 +123,11 @@ def main() -> None:
             **{f"pinn_{fm}": smallest_matching_n(ns, conv[v]["pinn_fields"], m, N) for fm, m in pinn_mean.items()},
         }
     out["fd_on_pinn_fields_129"] = {v: conv[v]["pinn_fields"][ns.index(N)] for v in ("cell", "nodal")}
+    # the stricter question: only grids whose nodes are a subset of the N-point grid
+    subgrids = [n for n in ns if n < N and (N - 1) % (n - 1) == 0]
+    out["matching_n_nested"] = {"grids": subgrids, **{
+        v: {k: smallest_matching_n(subgrids, [conv[v]["all200"][ns.index(n)] for n in subgrids], m, N)
+            for k, m in op_mean.items()} for v in ("cell", "nodal")}}
 
     # --- 2a. the same question under the easier convention: cell-average solver scored at its
     # own nodes (no interpolation), smallest whole number of points, searched up to N

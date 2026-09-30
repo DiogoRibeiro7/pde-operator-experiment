@@ -11,25 +11,25 @@
   "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
   "cpu_count": 2
  },
- "fd_single_dgtsv": 1.0230500038233004e-05,
- "fd_single_banded": 3.300850016785262e-05,
- "fd_single_dgtsv_257": 1.3735500033362769e-05,
- "fd_single_dgtsv_513": 2.060999986497336e-05,
- "fd_batch_numpy": 6.511927499559533e-06,
- "fd_batch_jax": 7.911349996447825e-07,
- "deeponet_single_full": 0.00015729450024082325,
- "deeponet_single_cached_trunk": 4.2089999851668836e-05,
- "deeponet_batch_full": 3.2168750010441727e-06,
- "deeponet_batch_cached_trunk": 1.9547875001535432e-06,
- "fno_single": 0.00031690700006947736,
- "fno_batch": 0.00015830957750040398,
+ "fd_single_dgtsv": 1.0236999997914609e-05,
+ "fd_single_banded": 3.335849999075435e-05,
+ "fd_single_dgtsv_257": 1.3838499995699749e-05,
+ "fd_single_dgtsv_513": 2.0760999973390426e-05,
+ "fd_batch_numpy": 6.452700000068035e-06,
+ "fd_batch_jax": 8.880999999405504e-07,
+ "deeponet_single_full": 0.00018544949998045013,
+ "deeponet_single_cached_trunk": 4.327650000846006e-05,
+ "deeponet_batch_full": 3.3104400000638633e-06,
+ "deeponet_batch_cached_trunk": 2.0278850000465808e-06,
+ "fno_single": 0.0003837515000100211,
+ "fno_batch": 0.0001587120499999628,
  "device_resident": {
   "note": "input already a float32 JAX array, output left on the device; not the common protocol",
-  "deeponet_single_cached_trunk": 3.6513499935608706e-05,
-  "deeponet_batch_cached_trunk": 2.2714174997418014e-06,
-  "fno_single": 0.00030202350012586976,
-  "fno_batch": 0.0001689908075013591,
-  "fd_batch_jax": 6.794274986532401e-07
+  "deeponet_single_cached_trunk": 3.3528499983503934e-05,
+  "deeponet_batch_cached_trunk": 2.4079674999200053e-06,
+  "fno_single": 0.000359120500007748,
+  "fno_batch": 0.0001703676275000987,
+  "fd_batch_jax": 7.522975000995302e-07
  },
  "flops_per_field": {
   "deeponet_cached_trunk": 115908.0,
@@ -37,38 +37,80 @@
   "fd_tridiagonal_estimate": 1016.0
  },
  "best": {
-  "fd_single": 1.0230500038233004e-05,
-  "fd_batch": 7.911349996447825e-07,
-  "deeponet_single": 4.2089999851668836e-05,
-  "deeponet_batch": 1.9547875001535432e-06,
-  "fno_single": 0.00031690700006947736,
-  "fno_batch": 0.00015830957750040398
+  "fd_single": 1.0236999997914609e-05,
+  "fd_batch": 8.880999999405504e-07,
+  "deeponet_single": 4.327650000846006e-05,
+  "deeponet_batch": 2.0278850000465808e-06,
+  "fno_single": 0.0003837515000100211,
+  "fno_batch": 0.0001587120499999628
  },
  "training": {
   "source": "measured by timing.py on this machine",
-  "fd_labels_seconds_per_instance": 1.303666149988203e-05,
+  "n_operator_runs": 3,
+  "n_pinn_fields": 5,
+  "fd_labels_seconds_per_instance": 3.3270724999852062e-06,
   "deeponet_train_seconds": [
-   29.7237654620003
+   31.41185044599996,
+   30.378702933,
+   29.435220802000003
   ],
   "fno_train_seconds": [
-   60.40260669899999
+   61.113600184999996,
+   59.48845676199994,
+   60.59706906400004
   ],
   "pinn_strong_train_seconds_train_family": [
-   41.09421633300008,
-   39.979878832000395
+   37.70204872699992,
+   39.61234901600005,
+   45.982603135999966,
+   63.45171480299996,
+   38.584107220999954
   ],
   "pinn_mixed_train_seconds_train_family": [
-   36.07940633999988,
-   35.74798629199995
+   31.217437578000045,
+   31.114533671000117,
+   30.994800728999962,
+   30.154349771999932,
+   31.32448694599998
   ]
  },
  "offline_seconds": {
-  "deeponet": 29.736802123500183,
-  "fno": 60.41564336049987
+  "deeponet": 30.41191846616664,
+  "fno": 60.40303574283331
+ },
+ "offline_seconds_range": {
+  "deeponet": [
+   29.43854787449999,
+   31.415177518499945
+  ],
+  "fno": [
+   59.49178383449993,
+   61.11692725749998
+  ]
  },
  "pinn_seconds_per_field": {
-  "strong": 40.537047582500236,
-  "mixed": 35.913696315999914
+  "strong": 45.06656458059997,
+  "mixed": 30.961121739200006
+ },
+ "pinn_seconds_per_field_range": {
+  "strong": [
+   37.70204872699992,
+   63.45171480299996
+  ],
+  "mixed": [
+   30.154349771999932,
+   31.32448694599998
+  ]
+ },
+ "breakeven_fields_vs_pinn_range": {
+  "deeponet": [
+   0.4639519667182919,
+   1.0418124667264677
+  ],
+  "fno": [
+   0.9375914271065089,
+   2.026803022436604
+  ]
  },
  "breakeven_queries_vs_fd": {
   "single": {
@@ -82,19 +124,19 @@
  },
  "breakeven_fields_vs_pinn": {
   "strong": {
-   "deeponet": 0.733570989919293,
-   "fno": 1.4903809468990827
+   "deeponet": 0.6748222046474385,
+   "fno": 1.3403070836430098
   },
   "mixed": {
-   "deeponet": 0.8280072834010165,
-   "fno": 1.6822452033037907
+   "deeponet": 0.9822615188926435,
+   "fno": 1.9509317605362073
   }
  },
  "million_queries_seconds_single": {
-  "fd": 10.230500038233004,
-  "deeponet": 71.82680197516902,
-  "fno": 377.32264342997723,
-  "pinn_strong": 40537047.582500234,
-  "pinn_mixed": 35913696.31599992
+  "fd": 10.236999997914609,
+  "deeponet": 73.6884184746267,
+  "fno": 444.15453575285443,
+  "pinn_strong": 45066564.58059997,
+  "pinn_mixed": 30961121.739200007
  }
 }

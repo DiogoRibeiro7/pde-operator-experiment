@@ -28,7 +28,7 @@ def adam(loss_fn, params, steps: int, lr: float, seed: int, chunk: int = 250):
     """Adam with a cosine-decayed learning rate. The history holds the mean loss of each chunk."""
     chunk = _check_steps(steps, chunk)
     if steps == 0:
-        return params, {"seconds": 0.0, "compile_seconds_est": 0.0, "history": []}
+        return params, {"seconds": 0.0, "compile_seconds_est": None, "history": []}
     opt = optax.adam(optax.cosine_decay_schedule(lr, steps, alpha=1e-2))
     state = opt.init(params)
 
@@ -54,9 +54,10 @@ def adam(loss_fn, params, steps: int, lr: float, seed: int, chunk: int = 250):
         chunk_times.append(time.perf_counter() - tc)
     jax.block_until_ready(params)
     total = time.perf_counter() - t0
-    # the first chunk includes JIT compilation; estimate it against the others
-    compile_est = chunk_times[0] - float(np.median(chunk_times[1:])) if len(chunk_times) > 1 else 0.0
-    return params, {"seconds": total, "compile_seconds_est": max(compile_est, 0.0), "history": history}
+    # The first chunk includes JIT compilation; estimate it against the others.
+    # With a single chunk there is nothing to compare with, so no estimate.
+    compile_est = max(chunk_times[0] - float(np.median(chunk_times[1:])), 0.0) if len(chunk_times) > 1 else None
+    return params, {"seconds": total, "compile_seconds_est": compile_est, "history": history}
 
 
 def lbfgs(loss_fn, params, steps: int, chunk: int = 100):
@@ -67,7 +68,9 @@ def lbfgs(loss_fn, params, steps: int, chunk: int = 100):
     if steps == 0:
         return params, {"seconds": 0.0, "history": []}
     opt = optax.lbfgs()
-    state = opt.init(params)
+    # optax initialises a few scalar counters as weakly typed; after one step they
+    # come back strongly typed, which would make jit compile `run` a second time.
+    state = jax.tree_util.tree_map(lambda v: jnp.asarray(v, dtype=jnp.result_type(v)), opt.init(params))
     value_and_grad = optax.value_and_grad_from_state(loss_fn)
 
     @jax.jit

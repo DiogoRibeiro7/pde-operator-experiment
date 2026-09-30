@@ -3156,6 +3156,23 @@
   "cell": 3.1904073933954375e-05,
   "nodal": 0.00013673996000561285
  },
+ "matching_n_nested": {
+  "grids": [
+   5,
+   9,
+   17,
+   33,
+   65
+  ],
+  "cell": {
+   "deeponet": 17,
+   "fno": 33
+  },
+  "nodal": {
+   "deeponet": 33,
+   "fno": 33
+  }
+ },
  "matching_n_at_own_nodes_cell": {
   "deeponet": 9,
   "fno": 14

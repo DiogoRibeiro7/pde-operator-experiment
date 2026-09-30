@@ -6,14 +6,14 @@ Every table on this page is generated from the files in `results/` when the site
 
 <!-- results:accuracy -->
 
-The operators were trained only on the training family. PINNs are trained separately for each of five fields per family; the strong form cannot be written for piecewise-constant coefficients.
+The operators were trained only on the training family. PINNs are trained separately for each field, on the first fields of each family; compare them with the row that scores the solver on those same fields rather than with the averages over all test fields. The strong form cannot be written for piecewise-constant coefficients.
 
 ![Instances and pointwise errors](figures/fig1_instances_and_errors.png)
 *One field from each family (top) and the absolute error of each method on it (bottom).*
 
 ## Accuracy measured in grid points
 
-How many grid points the solver needs to match each operator's mean error on the training family, on the common grid. The last column shows the answer under the easier but less fair convention of scoring the solver at its own nodes.
+How many grid points the solver needs to match each operator's mean error on the training family, on the common grid. A point-value solver on 27 points reads \(a\) at 27 points, most of which are not among the FNO's; the fifth column asks the stricter question of which sub-grids of the FNO's own grid (5, 9, 17, 33 or 65 points) are enough. The last column shows the answer under the easier but less fair convention of scoring the solver at its own nodes.
 
 <!-- results:matching -->
 

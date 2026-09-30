@@ -1,8 +1,9 @@
 """Locating, loading and regenerating the data of a run of run_experiment.py.
 
-The downstream scripts (check_reference.py, baselines.py, ablation_log_input.py,
-timing.py, make_figures.py) all go through this module, so they read the same
-folder, rebuild the same configuration the run used, and draw the same fields.
+The downstream scripts that regenerate data (check_reference.py, baselines.py,
+ablation_log_input.py, fno_padding_check.py, timing.py) go through this module,
+so they read the same folder, rebuild the same configuration the run used, and
+draw the same fields. make_figures.py only reads the result files.
 """
 
 from __future__ import annotations

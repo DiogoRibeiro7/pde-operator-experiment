@@ -25,18 +25,16 @@ jobs:
     env:
       RESULTS: ${{ inputs.quick && 'results-quick' || 'results' }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
           cache: pip
           cache-dependency-path: |
             requirements.txt
-            pyproject.toml
-      - name: Install (every package pinned)
-        run: |
-          pip install -r requirements.txt -c requirements-lock.txt
-          pip install -e . -c requirements-lock.txt
+            requirements-lock.txt
+      - name: Install (every package pinned; the scripts run from the repository root)
+        run: pip install -r requirements.txt -c requirements-lock.txt
       - name: Main run
         run: python run_experiment.py ${{ inputs.quick && '--quick' || '' }}
       - name: Downstream scripts
@@ -63,14 +61,14 @@ jobs:
           EOF
       - name: Upload the quick results
         if: ${{ always() && inputs.quick }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: reproduced-quick-${{ github.sha }}
           path: results-quick
           if-no-files-found: ignore
       - name: Upload the full results
         if: ${{ always() && !inputs.quick }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: reproduced-full-${{ github.sha }}
           path: |

@@ -6,10 +6,17 @@ complex matrices; project back to one channel; multiply by x (1 - x).
 
 The problem is not periodic, so the lifted field is zero-padded once, before
 the first Fourier layer, and cropped after the last one (the padded region
-does not stay zero in between). The padding is a fixed fraction of the grid
-(the padded period is always 9/8 of the domain), so a given Fourier mode means
-the same physical frequency at every resolution. That is what makes
-evaluation at other grids meaningful.
+does not stay zero in between). The padding is a fixed fraction of the grid:
+the padded period is exactly 9/8 of the domain whenever n - 1 is a multiple of
+8, so a given Fourier mode means the same physical frequency at every such
+resolution. That is what makes evaluation at other grids meaningful, and
+apply() refuses grids for which it does not hold (every grid used here,
+65 to 2049 points, qualifies).
+
+irfft discards the imaginary part of the zero-frequency coefficient, so the
+imaginary weights of mode 0 (4 layers x 32 x 32 = 4,096 of the 106,977
+parameters) never receive a gradient. The reference implementation behaves
+the same way.
 """
 
 from __future__ import annotations
@@ -46,6 +53,9 @@ def padding(n: int) -> int:
 def apply(params: dict, a_grid, x):
     """a_grid: (B, n) standardised log a on a uniform grid; x: (n,) -> (B, n)."""
     B, n = a_grid.shape
+    if n < 9 or (n - 1) % 8:
+        raise ValueError(f"the FNO needs n - 1 to be a positive multiple of 8 so that the padded period is "
+                         f"9/8 of the domain; got n = {n}")
     pad = padding(n)
     n_coef = (n + pad) // 2 + 1
     if params["layers"][0]["Rr"].shape[0] > n_coef:

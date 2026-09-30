@@ -1,12 +1,14 @@
 """Ablation: do the operators do better reading log a or a?
 
-    python ablation_log_input.py                        # about three minutes
+    python ablation_log_input.py                        # about four minutes
     python ablation_log_input.py --results results-quick
 
 Trains each operator twice on the same training pairs (the first run's subset
 at the headline training-set size), once reading a and once reading log a,
 with the run's budgets, and scores both on the training-family test fields.
-The log-a runs reproduce the first run of run_experiment.py exactly.
+On the CPU model of the main run, the log-a runs reproduce its first run
+exactly; on other CPUs the DeepONet still does, while the FNO moves slightly
+(about 0.4% in the mean error and a few percent in the median in one check).
 Writes ablation_log_input.json into the results folder.
 """
 

@@ -21,12 +21,22 @@ def draws():
     return {fam.name: fields.sample(fam, rng, 8) for fam in FAMILIES}
 
 
-def test_fields_are_positive_and_normalised(draws):
-    x = solver.grid(257)
-    for p in draws.values():
-        assert np.all(fields.a(p, x) > 0)
+def test_smooth_fields_follow_their_series_and_are_normalised(draws):
+    p = fields.take(draws["train"], 2)
+    x = np.array([0.0, 0.3, 0.71, 1.0])
+    k = np.arange(1, p["s"].size + 1)
+    direct = [np.sum(p["s"] * (p["xi"][0] * np.cos(np.pi * k * xi) + p["eta"][0] * np.sin(np.pi * k * xi)))
+              for xi in x]
+    np.testing.assert_allclose(fields.log_a(p, x)[0], direct, rtol=1e-12, atol=1e-12)
     s = fields.spectral_weights(TRAIN)
     assert np.isclose(np.sum(s**2), TRAIN.sigma**2)
+
+
+def test_piecewise_fields_are_constant_between_their_breakpoints(draws):
+    p = fields.take(draws["piecewise"], 0)
+    e = np.concatenate([[0.0], p["edges"][0], [1.0]])
+    mids = 0.5 * (e[:-1] + e[1:])
+    np.testing.assert_allclose(fields.log_a(p, mids)[0], p["levels"][0])
 
 
 def test_take_and_size(draws):
@@ -104,11 +114,29 @@ def test_exact_solution_scales_with_the_right_hand_side(draws):
 
 
 def test_exact_solution_on_grids_that_do_not_nest(draws):
+    """12 does not divide 32768, so the quadrature grid must be refined to contain the 13-point grid."""
+    p = fields.take(draws["train"], 1)
+    inv = lambda s: float(np.exp(-fields.log_a(p, np.array([s]))[0, 0]))  # noqa: E731
+    I0 = lambda x: quad(inv, 0, x, limit=200, epsabs=1e-13, epsrel=1e-12)[0]  # noqa: E731
+    I1 = lambda x: quad(lambda s: s * inv(s), 0, x, limit=200, epsabs=1e-13, epsrel=1e-12)[0]  # noqa: E731
+    C = I1(1.0) / I0(1.0)
+    x = solver.grid(13)
+    ref = np.array([C * I0(xi) - I1(xi) for xi in x])
+    u = solver.exact(p, 13)
+    assert abs(u[0, -1]) < 1e-14
+    np.testing.assert_allclose(u[0], ref, rtol=1e-10, atol=1e-13)
+
+
+def test_nodal_harmonic_mean():
+    a = np.array([[1.0, 3.0, 3.0, 0.5]])
+    np.testing.assert_allclose(solver.nodal_harmonic_a(a), [[1.5, 3.0, 6.0 / 7.0]])
+
+
+def test_point_value_scheme_is_second_order_on_smooth_fields(draws):
     p = draws["train"]
-    u = solver.exact(p, 13)                        # 12 does not divide 32768: the fine grid is refined
-    assert u.shape == (8, 13) and np.all(np.isfinite(u))
-    rel = rel_l2(solver.fd(p, 13), u).mean()
-    assert rel < 5e-2
+    errs = [rel_l2(solver.fd_nodal(p, n), solver.exact(p, n, n_fine=8193)).mean() for n in (65, 129, 257)]
+    rates = np.log2(np.array(errs[:-1]) / np.array(errs[1:]))
+    assert np.all(rates > 1.8), rates
 
 
 def test_three_point_grid(draws):

@@ -16,7 +16,7 @@ and \(u(1) = 0\) fixes \(C = I_1(1)/I_0(1)\). For piecewise-constant coefficient
 
 ## Coefficient families
 
-The coefficient is \(a = e^{g}\). In the smooth families, \(g\) is a stationary Gaussian field written as a cosine–sine series with frequencies \(\pi k\) (so it is not periodic on \([0, 1]\)), a squared-exponential spectrum of length scale \(\ell\) and pointwise standard deviation \(\sigma\).
+The coefficient is \(a = e^{g}\). In the smooth families, \(g\) is a stationary Gaussian field written as a cosine–sine series with frequencies \(\pi k\) (so it is not periodic on \([0, 1]\)), a Gaussian-shaped spectrum with spectral length scale \(\ell\), and pointwise standard deviation \(\sigma\). The series has no constant term, so the covariance is not the squared-exponential one and \(\ell\) is not a correlation length: for \(\ell = 0.15\) the correlation is about 0.52 at lag \(\ell\) and settles near \(-0.23\) beyond lag 0.5.
 
 | Family | Used for | Definition | What changes |
 | :--- | :--- | :--- | :--- |
@@ -30,7 +30,7 @@ The coefficient is \(a = e^{g}\). In the smooth families, \(g\) is a stationary 
 **Finite differences.** A finite-volume scheme on a uniform grid with a tridiagonal system, in two variants that differ only in what they know about \(a\):
 
 - *cell averages*: the harmonic mean of \(a\) over each cell, the standard choice for heterogeneous media; it needs \(a\) between the grid points;
-- *point values*: the harmonic mean of \(a\) at the two neighbouring nodes; it knows exactly what the FNO knows on the same grid.
+- *point values*: the harmonic mean of \(a\) at the two neighbouring nodes; like the FNO, it is given only point values of \(a\), at its own grid points and nothing in between.
 
 The cell-average scheme is second order on every family. The point-value scheme is second order on the smooth families and first order on piecewise-constant ones. The cell-average variant also produces the operators' training labels.
 
@@ -49,6 +49,6 @@ Both operators learn from 1,000 pairs \((a, u)\) with a relative \(L^2\) loss (4
 
 1. **Same test fields.** 200 fields per family, drawn once from a fixed seed.
 2. **Same grid.** Every method is scored on the 129-point grid; a solver run on a coarser grid is carried onto it by linear interpolation.
-3. **Same information.** The point-value solver sees only what the FNO sees.
+3. **Same kind of information.** The point-value solver is given only point values of \(a\), like the FNO. On most grid sizes those points are not the FNO's own, so the results page also reports the stricter comparison restricted to sub-grids of the FNO's grid.
 4. **Same clock.** Every method is timed from the same NumPy array of \(a\) at the grid points to a NumPy array of \(u\) at the grid points, conversions and preprocessing included, with training times measured on the same machine; for the solver and the DeepONet the faster of two reasonable implementations is reported.
 5. **No tuning on the test families.** Training budgets were set with a few calibration runs on the training family only; there was no hyperparameter search for any method.

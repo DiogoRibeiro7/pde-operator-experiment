@@ -62,7 +62,14 @@ def exact(p: dict, n: int, n_fine: int = 32769, chunk: int = 64, f: float = 1.0)
 
 
 def cell_harmonic_a(p: dict, n: int) -> np.ndarray:
-    """a_{i+1/2} = h / int_{x_i}^{x_{i+1}} 1/a, shape (draws, n - 1)."""
+    """a_{i+1/2} = h / int_{x_i}^{x_{i+1}} 1/a, shape (draws, n - 1).
+
+    Exact for piecewise-constant a. For smooth a the cell integral uses 4-point
+    Gauss-Legendre, which is accurate once cells are small against the field's
+    length scale: on the rough family (ell = 0.05) the cell means are off by up
+    to 23% at n = 5 and 1.7% at n = 9, but below 2e-4 from n = 17 on. Only the
+    n = 5 rough entry of the convergence table is visibly affected; the
+    training labels (n = 129) are not."""
     x = grid(n)
     h = 1.0 / (n - 1)
     if p["kind"] == "piecewise":

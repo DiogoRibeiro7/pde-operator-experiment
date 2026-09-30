@@ -17,7 +17,7 @@ class FieldFamily:
     """A distribution over coefficient fields a(x) = exp(g(x)).
 
     kind="smooth":    g is a stationary Gaussian field on [0, 1] with a
-                      squared-exponential spectrum of length scale `length_scale`
+                      Gaussian-shaped spectrum with spectral length scale `length_scale`
                       and pointwise standard deviation `sigma`.
     kind="piecewise": g is constant on `n_pieces` random intervals, with
                       i.i.d. N(0, sigma^2) levels, so a(x) jumps.

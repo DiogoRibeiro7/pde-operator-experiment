@@ -1,6 +1,6 @@
 """Time every method under one protocol, using the trained models saved by run_experiment.py.
 
-    python timing.py                        # about seven minutes; run it on an otherwise idle machine
+    python timing.py                        # about 12 minutes; run it on an otherwise idle machine
     python timing.py --reuse-train-times    # under a minute: training times from results.json
     python timing.py --results results-quick
 
@@ -21,9 +21,10 @@ For reference, timing.json also records the operators with their input already
 on the device as float32 ("device_resident"), which is the most favourable case
 for them; the figures and the article use the common protocol.
 
-Training costs (labels, one DeepONet, one FNO, and PINNs on the first training
-fields) are measured again here by default, so that every time in timing.json
-comes from the same machine. The trained models are discarded.
+Training costs (labels, every operator run and every PINN field of the main
+run, with the same seeds) are measured again here by default, so that every
+time in timing.json comes from the same machine; the spread across runs and
+fields is kept next to the means. The trained models are discarded.
 """
 
 from __future__ import annotations
@@ -75,22 +76,33 @@ def fd_banded(a: np.ndarray, f: float = 1.0) -> np.ndarray:
     return solver.fd_solve_one(solver.nodal_harmonic_a(a), f)
 
 
-def training_times(cfg, pool: dict, tests: dict, n_pinn: int) -> dict:
-    """Wall-clock training cost on this machine, compilation included, as in run_experiment.py."""
-    x = solver.grid(cfg.n_grid)
+def training_times(cfg, pool: dict, tests: dict, n_runs: int, n_pinn: int) -> dict:
+    """Wall-clock training cost on this machine, compilation included, for the same runs,
+    seeds and fields as run_experiment.py (the first `n_runs` operator runs, the first
+    `n_pinn` training-family fields). The trained models are discarded."""
+    N, f = cfg.n_grid, cfg.f_const
+    x = solver.grid(N)
+    a_half = solver.cell_harmonic_a(pool, N)              # evaluating the fields is not timed
     t0 = time.perf_counter()
-    u_pool = solver.fd(pool, cfg.n_grid, cfg.f_const)
-    out = {"source": "measured by timing.py on this machine",
+    u_pool = solver.fd_solve_batch(a_half, f)
+    out = {"source": "measured by timing.py on this machine", "n_operator_runs": n_runs, "n_pinn_fields": n_pinn,
            "fd_labels_seconds_per_instance": (time.perf_counter() - t0) / runs.pool_size(cfg)}
-    idx = np.sort(np.random.default_rng(1000).choice(runs.pool_size(cfg), cfg.n_train, replace=False))
-    p_tr = fields.take(pool, idx)
     for kind in ("deeponet", "fno"):
-        op = operators.fit(kind, cfg, p_tr, u_pool[idx], x, seed=int(kind == "fno"))
-        out[f"{kind}_train_seconds"] = [op.info["seconds"]]
+        out[f"{kind}_train_seconds"] = []
+    for s in range(n_runs):
+        idx = np.sort(np.random.default_rng(1000 + s).choice(runs.pool_size(cfg), cfg.n_train, replace=False))
+        p_tr = fields.take(pool, idx)
+        for kind in ("deeponet", "fno"):
+            op = operators.fit(kind, cfg, p_tr, u_pool[idx], x, seed=100 * s + (kind == "fno"))
+            out[f"{kind}_train_seconds"].append(op.info["seconds"])
     for form in ("strong", "mixed"):
         out[f"pinn_{form}_train_seconds_train_family"] = [
             pinn.fit(cfg, fields.take(tests["train"], i), seed=7 + i, form=form)[1]["seconds"] for i in range(n_pinn)]
     return out
+
+
+TRAIN_KEYS = ("fd_labels_seconds_per_instance", "deeponet_train_seconds", "fno_train_seconds",
+              "pinn_strong_train_seconds_train_family", "pinn_mixed_train_seconds_train_family")
 
 
 def main() -> None:
@@ -98,7 +110,10 @@ def main() -> None:
     ap.add_argument("--results", default=str(ROOT / "results"), help="folder written by run_experiment.py")
     ap.add_argument("--reuse-train-times", action="store_true",
                     help="take training times from results.json instead of measuring them on this machine")
-    ap.add_argument("--pinn-fields", type=int, default=2, help="PINNs per form to time (default 2)")
+    ap.add_argument("--operator-runs", type=int, default=None,
+                    help="operator training runs to time (default: all runs of the main run)")
+    ap.add_argument("--pinn-fields", type=int, default=None,
+                    help="PINNs per form to time (default: all PINN fields of the main run)")
     args = ap.parse_args()
     res_dir = Path(args.results)
     r, cfg = runs.load(res_dir)
@@ -197,16 +212,28 @@ def main() -> None:
         "fno_batch": T["fno_batch"],
     }
     if args.reuse_train_times:
-        tr = {"source": "results.json (the main run's machine)", **r["timing"]}
+        tr = {"source": "results.json (the main run's machine)", "environment": r["environment"],
+              **{k: r["timing"][k] for k in TRAIN_KEYS}}
     else:
-        tr = training_times(cfg, pool, tests, min(args.pinn_fields, cfg.n_pinn_instances))
+        n_runs = min(args.operator_runs or cfg.n_seeds, cfg.n_seeds)
+        n_pinn = min(args.pinn_fields or cfg.n_pinn_instances, cfg.n_pinn_instances)
+        tr = training_times(cfg, pool, tests, n_runs, n_pinn)
     T["training"] = tr
     label = tr["fd_labels_seconds_per_instance"] * cfg.n_train
-    offline = {k: float(np.mean(tr[f"{k}_train_seconds"])) + label for k in ("deeponet", "fno")}
-    pinn_s = {fm: float(np.mean(tr[f"pinn_{fm}_train_seconds_train_family"])) for fm in ("strong", "mixed")}
+    op_s = {k: np.asarray(tr[f"{k}_train_seconds"]) + label for k in ("deeponet", "fno")}
+    pn_s = {fm: np.asarray(tr[f"pinn_{fm}_train_seconds_train_family"]) for fm in ("strong", "mixed")}
+    offline = {k: float(v.mean()) for k, v in op_s.items()}
+    pinn_s = {fm: float(v.mean()) for fm, v in pn_s.items()}
     B = T["best"]
     T["offline_seconds"] = offline
+    T["offline_seconds_range"] = {k: [float(v.min()), float(v.max())] for k, v in op_s.items()}
     T["pinn_seconds_per_field"] = pinn_s
+    T["pinn_seconds_per_field_range"] = {fm: [float(v.min()), float(v.max())] for fm, v in pn_s.items()}
+    # how many PINN fields one operator training costs: from the most favourable pairing
+    # for the operator (its fastest run against the slowest PINN) to the least favourable
+    T["breakeven_fields_vs_pinn_range"] = {
+        k: [float(op_s[k].min() / max(v.max() for v in pn_s.values())),
+            float(op_s[k].max() / min(v.min() for v in pn_s.values()))] for k in op_s}
     T["breakeven_queries_vs_fd"] = {
         mode: {k: (offline[k] / (B[f"fd_{mode}"] - B[f"{k}_{mode}"]) if B[f"fd_{mode}"] > B[f"{k}_{mode}"] else None)
                for k in ("deeponet", "fno")} for mode in ("single", "batch")}

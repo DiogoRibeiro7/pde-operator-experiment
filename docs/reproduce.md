@@ -6,7 +6,7 @@
 git clone https://github.com/DiogoRibeiro7/pde-operator-experiment
 cd pde-operator-experiment
 python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements.txt -c requirements-lock.txt
 pip install -e .
 ```
 
@@ -14,13 +14,13 @@ Then run the pipeline in order:
 
 | Step | Command | Time on two CPU cores | Writes |
 | :--- | :--- | ---: | :--- |
-| Smoke test | `python run_experiment.py --quick` | about 2 min | `results-quick/` |
+| Smoke test | `python run_experiment.py --quick` | 2–3 min | `results-quick/` |
 | Main run | `python run_experiment.py` | about 64 min | `results/results.json`, `results/arrays.npz`, `results/models/` |
 | Reference check | `python check_reference.py` | seconds | `results/reference_check.json` |
 | Solver baselines | `python baselines.py` | under a minute | `results/baselines.json` |
-| Input ablation | `python ablation_log_input.py` | about 3 min | `results/ablation_log_input.json` |
+| Input ablation | `python ablation_log_input.py` | about 4 min | `results/ablation_log_input.json` |
 | FNO padding check | `python fno_padding_check.py` | seconds | `results/fno_padding_check.json` |
-| Timing | `python timing.py` | about 5 min | `results/timing.json` |
+| Timing | `python timing.py` | about 12 min | `results/timing.json` |
 | Figures | `python make_figures.py` | seconds | `figures/`, `results/derived.json` |
 
 The later steps read the main run's outputs, so run them after it. Each of them takes `--results DIR`, so the whole pipeline also runs on a quick run:
@@ -35,7 +35,7 @@ python timing.py --results results-quick
 python make_figures.py --results results-quick   # figures go to results-quick/figures/
 ```
 
-`timing.py` measures the training costs again on the machine it runs on, so that every time it reports comes from one machine; `--reuse-train-times` takes them from `results.json` instead.
+`timing.py` measures the training costs again on the machine it runs on, for every operator run and every PINN field of the main run with the same seeds, so that every time it reports comes from one machine; `--operator-runs` and `--pinn-fields` time fewer, and `--reuse-train-times` takes them from `results.json` (the main run's machine) instead. The machine of the timing run need not be the machine of the accuracy run; both record their CPU.
 
 `requirements.txt` pins the direct dependencies used for the committed results (Python 3.11, JAX 0.10.2 on CPU, optax 0.2.8, NumPy 2.4.4, SciPy 1.17.1, Matplotlib 3.10.9), and `requirements-lock.txt` pins every package they pull in. The accuracy results are reproducible bit for bit with those versions on the same CPU model; on other hardware the network-based numbers can differ in the last digits. Timings are machine-dependent.
 

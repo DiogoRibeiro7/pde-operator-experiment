@@ -46,6 +46,11 @@ def summary(e: np.ndarray) -> dict:
             "p90": float(np.quantile(e, 0.9)), "max": float(e.max()), "n": int(e.size)}
 
 
+def is_committed_results(out: str | Path) -> bool:
+    """True if `out` is the committed results/ folder, however the path is spelled (symlinks included)."""
+    return Path(out).resolve() == (ROOT / "results").resolve()
+
+
 def main() -> None:
     global OUT
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
@@ -54,7 +59,7 @@ def main() -> None:
     args = ap.parse_args()
     cfg = quick(Config()) if args.quick else Config()
     OUT = os.path.abspath(args.out or str(ROOT / ("results-quick" if args.quick else "results")))
-    if args.quick and Path(OUT) == ROOT / "results":
+    if args.quick and is_committed_results(OUT):
         ap.error("--quick must not write into results/, which holds the full run")
     os.makedirs(OUT, exist_ok=True)
     open(os.path.join(OUT, "run.log"), "w").close()

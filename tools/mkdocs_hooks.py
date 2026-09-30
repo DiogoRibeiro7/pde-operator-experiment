@@ -9,7 +9,6 @@ agrees with the committed results and metadata without hand-copied numbers.
 from __future__ import annotations
 
 import json
-import math
 import re
 import shutil
 import tomllib
@@ -48,13 +47,21 @@ def table(header: list[str], rows: list[list[str]], align: str | None = None) ->
 
 def accuracy_table() -> str:
     r, b = load("results.json"), load("baselines.json")
-    rows = [["Finite differences, cell averages (129 pts)"] + [sci(b["fd129"][f]["cell"]["mean"]) for f in FAMILIES],
-            ["Finite differences, point values (129 pts)"] + [sci(b["fd129"][f]["nodal"]["mean"]) for f in FAMILIES]]
-    for form, label in (("strong", "PINN, strong form (5 fields)"), ("mixed", "PINN, flux form (5 fields)")):
-        rows.append([label] + [sci(mean(x["rel_l2"] for x in r["pinn"][f][form])) if form in r["pinn"][f] else "n/a"
-                               for f in FAMILIES])
-    for k, label in (("deeponet", "DeepONet (3 runs)"), ("fno", "FNO (3 runs)")):
-        rows.append([label] + [sci(mean(x["mean"] for x in r["operators"]["shift"][k][f])) for f in FAMILIES])
+    c = r["config"]
+    n, n_test, n_pinn, n_runs = c["n_grid"], c["n_test"], c["n_pinn_instances"], c["n_seeds"]
+    rows = [[f"Finite differences, cell averages ({n} pts, {n_test} fields)"]
+            + [sci(b["fd129"][f]["cell"]["mean"]) for f in FAMILIES],
+            [f"Finite differences, point values ({n} pts, {n_test} fields)"]
+            + [sci(b["fd129"][f]["nodal"]["mean"]) for f in FAMILIES],
+            [f"Finite differences, cell averages ({n} pts), on the {n_pinn} PINN fields"]
+            + [sci(mean(r["pinn_paired_instances"][f]["fd"])) for f in FAMILIES]]
+    for form, label in (("strong", "PINN, strong form"), ("mixed", "PINN, flux form")):
+        rows.append([f"{label} ({n_pinn} fields)"]
+                    + [sci(mean(x["rel_l2"] for x in r["pinn"][f][form])) if form in r["pinn"][f] else "n/a"
+                       for f in FAMILIES])
+    for k, label in (("deeponet", "DeepONet"), ("fno", "FNO")):
+        rows.append([f"{label} ({n_runs} runs, {n_test} fields)"]
+                    + [sci(mean(x["mean"] for x in r["operators"]["shift"][k][f])) for f in FAMILIES])
     return table(["Method"] + [FAMILY_LABEL[f] for f in FAMILIES], rows)
 
 
@@ -68,23 +75,36 @@ def matching_table() -> str:
     rows = []
     for k, label in (("fno", "FNO"), ("deeponet", "DeepONet")):
         rows.append([label, sci(m[k]), count(b["matching_n"]["nodal"][k]), count(b["matching_n"]["cell"][k]),
-                     count(b["matching_n_at_own_nodes_cell"][k])])
+                     count(b["matching_n_nested"]["nodal"][k]), count(b["matching_n_at_own_nodes_cell"][k])])
     return table(["Operator", "Mean error", "Point-value solver", "Cell-average solver",
-                  "Cell-average, scored at its own nodes"], rows)
+                  "Point-value solver, sub-grids of the FNO's grid only", "Cell-average, scored at its own nodes"],
+                 rows)
 
 
 def timing_table() -> str:
     t = load("timing.json")
-    best = t["best"]
+    best, tr = t["best"], t["training"]
     us = lambda s: f"{s * 1e6:,.1f} µs"  # noqa: E731
+
+    def spread(mean_s, rng, unit=""):
+        return f"{mean_s:.0f} s{unit} ({rng[0]:.0f}–{rng[1]:.0f})"
+
+    runs, fields = tr.get("n_operator_runs"), tr.get("n_pinn_fields")
     rows = [["Finite differences (point values)", us(best["fd_single"]), us(best["fd_batch"]), "none"],
             ["DeepONet", us(best["deeponet_single"]), us(best["deeponet_batch"]),
-             f"{t['offline_seconds']['deeponet']:.0f} s"],
-            ["FNO", us(best["fno_single"]), us(best["fno_batch"]), f"{t['offline_seconds']['fno']:.0f} s"],
-            ["PINN, flux form", "—", "—", f"{t['pinn_seconds_per_field']['mixed']:.0f} s per field"],
-            ["PINN, strong form", "—", "—", f"{t['pinn_seconds_per_field']['strong']:.0f} s per field"]]
+             spread(t["offline_seconds"]["deeponet"], t["offline_seconds_range"]["deeponet"])],
+            ["FNO", us(best["fno_single"]), us(best["fno_batch"]),
+             spread(t["offline_seconds"]["fno"], t["offline_seconds_range"]["fno"])],
+            ["PINN, flux form", "—", "—",
+             spread(t["pinn_seconds_per_field"]["mixed"], t["pinn_seconds_per_field_range"]["mixed"], " per field")],
+            ["PINN, strong form", "—", "—",
+             spread(t["pinn_seconds_per_field"]["strong"], t["pinn_seconds_per_field_range"]["strong"], " per field")]]
+    main_cpu = load("results.json")["environment"]["cpu"]
+    note = (f"\n\nTraining: mean (range) over {runs} operator runs and {fields} PINN fields. All times on this "
+            f"page were measured on {t['environment']['cpu']} ({t['environment']['cpu_count']} cores); the "
+            f"accuracy results come from the main run on {main_cpu}.")
     return table(["Method", "One field per call", f"Per field, {t['n_fields_batch']} per call", "Training"],
-                 rows, "lrrr")
+                 rows, "lrrr") + note
 
 
 def sweep_table() -> str:
@@ -96,19 +116,22 @@ def sweep_table() -> str:
 
 
 def bibtex() -> str:
-    version = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]["version"]
-    date = re.search(r'^date-released: "?(\d{4})', (ROOT / "CITATION.cff").read_text(), re.M)
-    year = date.group(1) if date else ""
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]
+    cff = (ROOT / "CITATION.cff").read_text()
+
+    def field(name: str) -> str:
+        m = re.search(rf'^{name}: "?(.*?)"?$', cff, re.M)
+        return m.group(1) if m else ""
+
     return "\n".join([
         "```bibtex",
         "@software{ribeiro_pde_operator_experiment,",
         "  author  = {Ribeiro, Diogo},",
-        "  title   = {pde-operator-experiment: a classical solver, a PINN, a DeepONet and an FNO",
-        "             on one elliptic PDE with an exact solution},",
-        f"  year    = {{{year}}},",
-        f"  version = {{{version}}},",
-        "  license = {Apache-2.0},",
-        "  url     = {https://github.com/DiogoRibeiro7/pde-operator-experiment}",
+        f"  title   = {{{field('title')}}},",
+        f"  year    = {{{field('date-released')[:4]}}},",
+        f"  version = {{{project['version']}}},",
+        f"  license = {{{field('license')}}},",
+        f"  url     = {{{field('repository-code')}}}",
         "}",
         "```"])
 
@@ -123,8 +146,13 @@ def values() -> dict[str, str]:
     shift = r["operators"]["shift"]
     op_mean = {k: {f: mean(x["mean"] for x in shift[k][f]) for f in FAMILIES} for k in ("deeponet", "fno")}
     worst = max(op_mean[k][f] / op_mean[k]["train"] for k in op_mean for f in FAMILIES[1:])
-    pinn_fields = max(v for row in t["breakeven_fields_vs_pinn"].values() for v in row.values())
-    out = {"max_shift_factor": f"{worst:.0f}", "pinn_fields_ceiling": str(math.ceil(pinn_fields))}
+    rng = t["breakeven_fields_vs_pinn_range"]
+    lo, hi = min(v[0] for v in rng.values()), max(v[1] for v in rng.values())
+    out = {"max_shift_factor": f"{worst:.0f}",
+           "pinn_fields_range": f"between {lo:.1f} and {hi:.1f}"}
+    nf, nd = (count(b["matching_n_nested"]["nodal"][k]) for k in ("fno", "deeponet"))
+    out["match_nested_text"] = (f"{nf} points match both" if nf == nd
+                                else f"{nf} and {nd} points match them respectively")
     for v in ("nodal", "cell"):
         for k in ("fno", "deeponet"):
             out[f"match_{v}_{k}"] = count(b["matching_n"][v][k])

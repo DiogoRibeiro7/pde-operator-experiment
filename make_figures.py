@@ -85,13 +85,15 @@ def main() -> None:
                     help="output folder (default: figures/ for results/, otherwise <results>/figures)")
     args = ap.parse_args()
     RES = os.path.abspath(args.results)
-    FIG = args.figures or (str(ROOT / "figures") if Path(RES) == ROOT / "results" else os.path.join(RES, "figures"))
+    committed = Path(RES).resolve() == (ROOT / "results").resolve()
+    FIG = args.figures or (str(ROOT / "figures") if committed else os.path.join(RES, "figures"))
     os.makedirs(FIG, exist_ok=True)
     r = json.load(open(os.path.join(RES, "results.json")))
     A = np.load(os.path.join(RES, "arrays.npz"))
     derived: dict = {}
     x = A["x"]
     op = r["operators"]
+    cfg_run = r["config"]
 
     # ----------------------------------------------------------------- fig 1
     fig, axes = plt.subplots(2, 4, figsize=(13, 6.4), sharex=True,
@@ -157,8 +159,8 @@ def main() -> None:
         ax.plot([129], [e[i129]], "s", color=C["fd"], ms=6, mfc="white" if v == "cell" else C["fd"], mew=1.4, zorder=3)
     ax.text(122, 5.3e-5, "129 points:\nno interpolation", fontsize=9, color=INK2, ha="right", va="center")
     ax.text(5.3, 4e-5, "finite differences, error against the exact solution\n"
-            "solid: given a at its grid points only (as the FNO is)\n"
-            "dashed: given cell averages of 1/a", color=C["fd"], fontsize=9.5, va="bottom")
+            "solid: point values of a at its own grid points\n"
+            "dashed: cell averages of 1/a", color=C["fd"], fontsize=9.5, va="bottom")
     levels = bl["model_mean_error_train"]
     specs = (("fno", "FNO", C["fno"]), ("deeponet", "DeepONet", C["deeponet"]))
     ys = spread([levels[k] for k, *_ in specs], min_ratio=6.0)
@@ -183,8 +185,8 @@ def main() -> None:
     ax.set_xlim(4.4, 150)
     ax.set_ylim(1.5e-5, 0.4)
     header(fig, "How many grid points does the solver need to match each operator?",
-           "All errors on the same 129-point grid and the same 200 test fields; coarser solver solutions are "
-           "interpolated linearly onto it.")
+           f"All errors on the same {cfg_run['n_grid']}-point grid and the same {cfg_run['n_test']} test fields; "
+           "coarser solver solutions are interpolated linearly onto it.")
     fig.tight_layout(rect=(0, 0.03, 0.76, 0.88))
     fig.savefig(os.path.join(FIG, "fig2_accuracy_ladder.png"))
     plt.close(fig)
@@ -273,8 +275,9 @@ def main() -> None:
                plt.Line2D([], [], color=C["fno"], marker="o", ls="", ms=8, label="FNO")]
     ax.legend(handles=handles, loc="lower left", ncol=3, fontsize=9.5, bbox_to_anchor=(0, 1.0))
     header(fig, "What happens when the coefficient leaves the training distribution",
-           "Dots: median. Whiskers: up to the 90th percentile over 200 test fields (solver; operators, "
-           "averaged over 3 runs), or min–max over 5 fields (PINNs).")
+           f"Dots: median. Whiskers: up to the 90th percentile over {cfg_run['n_test']} test fields (solvers; "
+           f"operators, averaged over {cfg_run['n_seeds']} runs), or min–max over {cfg_run['n_pinn_instances']} "
+           "fields (PINNs).")
     fig.tight_layout(rect=(0, 0.03, 1, 0.86))
     fig.savefig(os.path.join(FIG, "fig4_distribution_shift.png"))
     plt.close(fig)
@@ -292,7 +295,7 @@ def main() -> None:
     ax.plot(Q, Q * pinn_s["strong"], color=C["pinn"], lw=1.2)
     for key, y in lines.items():
         ax.plot(Q, y, color=C[key], lw=2)
-    names = {"fd": "Finite differences", "pinn": "PINN, one per field\n(flux to strong form)",
+    names = {"fd": "Finite differences\n(point values)", "pinn": "PINN, one per field\n(flux to strong form)",
              "deeponet": "DeepONet", "fno": "FNO"}
     ends = spread([lines[k][-1] for k in lines], min_ratio=2.2)
     for (key, y), ylab in zip(lines.items(), ends, strict=True):

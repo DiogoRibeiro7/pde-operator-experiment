@@ -31,7 +31,7 @@ The problem is \(-(a(x)\,u'(x))' = 1\) on \((0, 1)\) with \(u(0) = u(1) = 0\) an
 
     ---
 
-    Every method is scored on the same 129-point grid and timed from the same input. The solver is also run knowing only the point values of \(a\), exactly what the FNO sees.
+    Every method is scored on the same 129-point grid and timed from the same input. The solver is also run knowing only point values of \(a\), the kind of input the FNO gets.
 
     [:octicons-arrow-right-24: The results](results.md)
 
@@ -47,6 +47,6 @@ The problem is \(-(a(x)\,u'(x))' = 1\) on \((0, 1)\) with \(u(0) = u(1) = 0\) an
 
 ## In one paragraph
 
-On the family of coefficients they were trained on, the FNO and the DeepONet reach mean errors that the finite-difference solver matches with <!-- value:match_nodal_fno --> and <!-- value:match_nodal_deeponet --> grid points respectively, even when it sees only the point values of the coefficient. Off that family their mean errors grow by up to <!-- value:max_shift_factor -->-fold. A PINN written in the strong form is more accurate than the 129-point solver on training-family fields and fails on rough ones; the same network written in flux form works on every family. Training either operator costs less than training PINNs for <!-- value:pinn_fields_ceiling --> fields, and never pays off against the solver. The numbers on this page and the tables on the [results page](results.md) are generated from the committed result files at build time.
+On the family of coefficients they were trained on, the FNO and the DeepONet reach mean errors that the finite-difference solver matches with <!-- value:match_nodal_fno --> and <!-- value:match_nodal_deeponet --> grid points respectively, even when it is given only point values of the coefficient; restricted to sub-grids of the FNO's own grid, <!-- value:match_nested_text -->. Off that family their mean errors grow by up to <!-- value:max_shift_factor -->-fold. A PINN written in the strong form is more accurate than the 129-point solver on training-family fields and fails on rough ones; the same network written in flux form works on every family. Training either operator costs as much as training PINNs for <!-- value:pinn_fields_range --> fields, and never pays off against the solver. The numbers on this page and the tables on the [results page](results.md) are generated from the committed result files at build time.
 
 This repository accompanies Part 3 of a series on scientific machine learning. Part 1: [Beyond PINNs: A Map of Modern Neural Network Paradigms](https://medium.com/@diogo-ribeiro-1975/beyond-pinns-a-map-of-modern-neural-network-paradigms-ee5956e2df51). Part 2: [PINNs vs Neural Operators](https://medium.com/@diogo-ribeiro-1975/pinns-vs-neural-operators-09b3e9806d6e).

@@ -46,6 +46,8 @@ def first_spectral_layer(params: dict, scaler: dict, p_one: dict, n: int, vanish
     low = jnp.einsum("bmi,mio->bmo", hf[:, :m], layer["Rr"] + 1j * layer["Ri"])
     hf = jnp.concatenate([low, jnp.zeros((1, hf.shape[1] - m, h.shape[-1]), hf.dtype)], axis=1)
     out = np.asarray(jnp.fft.irfft(hf, n=n + pad, axis=1))[0, :n]
+    if (n - 1) % (COMMON_N - 1):
+        raise ValueError(f"the {COMMON_N}-point grid must nest in the {n}-point grid")
     return out[:: (n - 1) // (COMMON_N - 1)]
 
 

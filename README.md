@@ -28,7 +28,7 @@ Part 2: [PINNs vs Neural Operators](https://medium.com/@diogo-ribeiro-1975/pinns
 
 1. **The solver itself.** Convergence of the finite-difference scheme against the exact
    solution, for every coefficient family, in two variants: one given cell averages of
-   1/a, and one given only the point values of a that the FNO sees.
+   1/a, and one given only point values of a at its own grid points, like the FNO.
 2. **In-distribution accuracy.** DeepONet and FNO trained on 1,000 (a, u) pairs; PINNs
    trained on individual fields; everything evaluated on the same test fields.
 3. **Training-set size.** Operators trained on 50 to 2,000 pairs, three runs each.
@@ -48,9 +48,9 @@ python run_experiment.py --quick    # smoke test, about two minutes, writes resu
 python run_experiment.py            # main run, about an hour on two CPU cores
 python check_reference.py           # quadrature check on the exact solution
 python baselines.py                 # both solver variants on the common 129-point grid
-python ablation_log_input.py        # log a against a as the operators' input (~3 min)
+python ablation_log_input.py        # log a against a as the operators' input (~4 min)
 python fno_padding_check.py         # how the FNO's padding depends on the grid
-python timing.py                    # every method timed under one protocol (~5 min)
+python timing.py                    # every method timed under one protocol (~12 min)
 python make_figures.py              # figures/ and results/derived.json
 ```
 
@@ -66,7 +66,9 @@ article quotes.
 Accuracy results are reproducible bit for bit with the pinned versions on the same CPU
 model; on other hardware the network-based numbers can differ in the last digits.
 Timings are machine-dependent: `timing.py` measures inference and training again on
-the machine it runs on, so every time in `timing.json` comes from one machine. (The
+the machine it runs on (every operator run and every PINN field of the main run, with
+the same seeds), so every time in `timing.json` comes from one machine, which may not
+be the machine of the accuracy run; both record their CPU. (The
 inference timings that older runs recorded in `results.json` are superseded by
 `timing.json`.)
 

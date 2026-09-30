@@ -1,9 +1,15 @@
 name: Release
 
-# Run from the Actions tab. Sets the version in pyproject.toml and
-# CITATION.cff, runs the checks and the docs build, commits the bump if there
-# is one, tags it and publishes a GitHub release with the results and figures
-# attached. With the Zenodo GitHub integration enabled, each release gets a DOI.
+# Run from the Actions tab, on main, with the new version number. The workflow
+# sets the version in pyproject.toml and CITATION.cff, runs the checks and the
+# docs build, commits the bump if there is one, tags it, publishes a GitHub
+# release with the results and figures attached, and rebuilds the docs site.
+# With the Zenodo GitHub integration enabled, each release gets a DOI.
+#
+# It can be rerun safely: if the tag already exists but the release does not
+# (a previous run failed after tagging), it resumes from the tag and only
+# creates the release. If a branch ruleset protects main, add GitHub Actions to
+# its bypass list, or the version commit will be rejected.
 
 on:
   workflow_dispatch:
@@ -15,6 +21,7 @@ on:
 
 permissions:
   contents: write
+  actions: write          # to start the Docs workflow after the version bump
 
 concurrency:
   group: release
@@ -22,20 +29,35 @@ concurrency:
 
 jobs:
   release:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      VERSION: ${{ inputs.version }}
+      GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: main
           fetch-depth: 0
 
-      - name: Validate the version
-        env:
-          VERSION: ${{ inputs.version }}
+      - name: Validate the version, or resume an interrupted release
+        id: plan
         run: |
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::'$VERSION' is not MAJOR.MINOR.PATCH"; exit 1; }
           if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
-            echo "::error::tag v$VERSION already exists"; exit 1
+            if gh release view "v$VERSION" >/dev/null 2>&1; then
+              echo "::error::v$VERSION is already released"; exit 1
+            fi
+            echo "::notice::tag v$VERSION exists without a release: resuming from the tag"
+            git checkout -q "v$VERSION"
+            echo "resume=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          current="$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")"
+          lowest="$(printf '%s\n%s\n' "$current" "$VERSION" | sort -V | head -n 1)"
+          if [ "$lowest" != "$current" ]; then
+            echo "::error::$VERSION is lower than the version in pyproject.toml ($current)"; exit 1
           fi
           latest="$(git tag --list 'v*' --sort=-v:refname | head -n 1)"
           if [ -n "$latest" ]; then
@@ -44,17 +66,19 @@ jobs:
               echo "::error::$VERSION is not higher than the latest release $latest"; exit 1
             fi
           fi
+          echo "resume=false" >> "$GITHUB_OUTPUT"
 
       - name: Set the version and release date
-        env:
-          VERSION: ${{ inputs.version }}
+        if: steps.plan.outputs.resume == 'false'
         run: |
           sed -i -E "s/^version = \".*\"/version = \"$VERSION\"/" pyproject.toml
           sed -i -E "s/^version: .*/version: \"$VERSION\"/" CITATION.cff
           sed -i -E "s/^date-released: .*/date-released: \"$(date -u +%F)\"/" CITATION.cff
+          grep -qx "version = \"$VERSION\"" pyproject.toml || { echo "::error::pyproject.toml was not updated"; exit 1; }
+          grep -qx "version: \"$VERSION\"" CITATION.cff || { echo "::error::CITATION.cff was not updated"; exit 1; }
           git diff --stat
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - name: Check
@@ -64,10 +88,10 @@ jobs:
           ruff check .
           pytest
           mkdocs build --strict
+          rm -rf site
 
       - name: Commit, tag and push
-        env:
-          VERSION: ${{ inputs.version }}
+        if: steps.plan.outputs.resume == 'false'
         run: |
           git config user.name "Diogo Ribeiro"
           git config user.email "diogo_dj@hotmail.com"
@@ -79,16 +103,15 @@ jobs:
           git push origin "v$VERSION"
 
       - name: Package results and figures
-        env:
-          VERSION: ${{ inputs.version }}
         run: zip -r "pde-operator-experiment-v$VERSION-results.zip" results figures
 
       - name: Create the GitHub release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ inputs.version }}
         run: |
-          gh release create "v$VERSION" \
+          gh release view "v$VERSION" >/dev/null 2>&1 || gh release create "v$VERSION" \
             --title "v$VERSION" \
             --generate-notes \
             "pde-operator-experiment-v$VERSION-results.zip"
+
+      - name: Rebuild the docs site with the new version
+        # Pushes made with GITHUB_TOKEN do not start other workflows; a dispatch does.
+        run: gh workflow run docs.yml --ref main
