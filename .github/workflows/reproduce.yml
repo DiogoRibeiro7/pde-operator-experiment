@@ -1,0 +1,67 @@
+name: Reproduce results
+
+# Runs the complete pipeline from scratch on a GitHub runner and uploads the
+# results and figures as an artifact. Nothing is committed: compare the
+# artifact with results/ and figures/, and open a pull request if they should
+# be replaced. Timings depend on the machine and will differ from the
+# committed ones; accuracy numbers should not.
+
+on:
+  workflow_dispatch:
+    inputs:
+      quick:
+        description: "Tiny configuration (a few minutes) instead of the full run"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  reproduce:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install
+        run: |
+          pip install -r requirements.txt
+          pip install -e .
+      - name: Quick run
+        if: inputs.quick
+        run: python run_experiment.py --quick
+      - name: Full pipeline
+        if: ${{ !inputs.quick }}
+        run: |
+          python run_experiment.py
+          python check_reference.py
+          python baselines.py
+          python ablation_log_input.py
+          python timing.py
+          python make_figures.py
+      - name: Compare with the committed accuracy results
+        if: ${{ !inputs.quick }}
+        run: |
+          python - <<'EOF'
+          import json, subprocess
+          def pair(name):
+              old = json.loads(subprocess.check_output(["git", "show", f"HEAD:results/{name}"]))
+              return old, json.load(open(f"results/{name}"))
+          for name, keys in (("baselines.json", ("model_mean_error_train", "matching_n")),
+                             ("derived.json", ("fd_convergence_slope_by_family",))):
+              old, new = pair(name)
+              for k in keys:
+                  print(f"{name}:{k}\n  committed: {old.get(k)}\n  this run:  {new.get(k)}")
+          EOF
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reproduced-${{ inputs.quick && 'quick' || 'full' }}-${{ github.sha }}
+          path: |
+            results
+            results-quick
+            figures
+          if-no-files-found: ignore

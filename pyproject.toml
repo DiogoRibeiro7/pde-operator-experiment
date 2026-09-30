@@ -1,0 +1,67 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pde-operator-experiment"
+version = "1.0.0"
+description = "A classical solver, a PINN, a DeepONet and an FNO on one elliptic PDE with an exact solution"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [{ name = "Diogo Ribeiro", email = "dfr@esmad.ipp.pt" }]
+maintainers = [{ name = "Diogo Ribeiro", email = "dfr@esmad.ipp.pt" }]
+requires-python = ">=3.11"
+keywords = [
+    "scientific machine learning",
+    "physics-informed neural networks",
+    "neural operators",
+    "DeepONet",
+    "Fourier neural operator",
+    "finite differences",
+    "reproducibility",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "numpy>=2.0",
+    "scipy>=1.14",
+    "matplotlib>=3.9",
+    "jax>=0.10",
+    "optax>=0.2.8",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6"]
+docs = ["mkdocs>=1.6,<2", "mkdocs-material>=9.5,<10"]
+
+[project.urls]
+Homepage = "https://github.com/DiogoRibeiro7/pde-operator-experiment"
+Documentation = "https://diogoribeiro7.github.io/pde-operator-experiment/"
+Source = "https://github.com/DiogoRibeiro7/pde-operator-experiment"
+Issues = "https://github.com/DiogoRibeiro7/pde-operator-experiment/issues"
+
+[tool.setuptools]
+packages = ["elliptic1d"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+extend-exclude = ["docs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+# B023: the lambdas passed to the timing helper are called inside the same loop iteration
+ignore = ["E741", "B023"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

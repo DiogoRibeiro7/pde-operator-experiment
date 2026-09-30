@@ -1,0 +1,30 @@
+cff-version: 1.2.0
+message: "If you use this software or its results, please cite it as below."
+title: "pde-operator-experiment: a classical solver, a PINN, a DeepONet and an FNO on one elliptic PDE with an exact solution"
+type: software
+version: "1.0.0"
+date-released: "2026-09-30"
+license: Apache-2.0
+repository-code: "https://github.com/DiogoRibeiro7/pde-operator-experiment"
+url: "https://diogoribeiro7.github.io/pde-operator-experiment/"
+abstract: >-
+  A reproducible comparison of a finite-difference solver, a physics-informed
+  neural network, a DeepONet and a Fourier neural operator on the
+  one-dimensional elliptic equation -(a u')' = 1 with random coefficients,
+  scored against an exact solution. It measures in-distribution accuracy,
+  training-set size, distribution shift, resolution transfer and cost, with
+  the classical solver treated as a competitor on equal terms.
+keywords:
+  - scientific machine learning
+  - physics-informed neural networks
+  - neural operators
+  - DeepONet
+  - Fourier neural operator
+  - finite differences
+  - reproducibility
+authors:
+  - family-names: Ribeiro
+    given-names: Diogo
+    email: dfr@esmad.ipp.pt
+    orcid: "https://orcid.org/0009-0001-2022-7072"
+    affiliation: "Faculdade de Media Artes e Design, Universidade Técnica do Porto"

@@ -1,0 +1,64 @@
+{
+ "protocol": "input: a at the 129 grid points (DeepONet: its 65 sensors); output: u at the 129 grid points; input preprocessing inside the timed region; field generation excluded; single = one field per call, batch = 200 fields per call (per-field time)",
+ "n_fields_batch": 200,
+ "fd_single_dgtsv": 1.1682500371534843e-05,
+ "fd_single_banded": 4.108800021640491e-05,
+ "fd_single_dgtsv_257": 2.265450075356057e-05,
+ "fd_single_dgtsv_513": 2.2322999939206056e-05,
+ "fd_batch_numpy": 7.973842498358863e-06,
+ "fd_batch_jax": 1.2023599992971868e-06,
+ "deeponet_single_full": 0.00017982450117415283,
+ "deeponet_single_cached_trunk": 5.499549934029346e-05,
+ "deeponet_batch_full": 3.4771475020534125e-06,
+ "deeponet_batch_cached_trunk": 2.9429150026771823e-06,
+ "fno_single": 0.00041855899962683907,
+ "fno_batch": 0.00025123811249613934,
+ "flops_per_field": {
+  "deeponet_cached_trunk": 115908.0,
+  "fno": 4341445.0,
+  "fd_tridiagonal_estimate": 1016.0
+ },
+ "best": {
+  "fd_single": 1.1682500371534843e-05,
+  "fd_batch": 1.2023599992971868e-06,
+  "deeponet_single": 5.499549934029346e-05,
+  "deeponet_batch": 2.9429150026771823e-06,
+  "fno_single": 0.00041855899962683907,
+  "fno_batch": 0.00025123811249613934
+ },
+ "offline_seconds": {
+  "deeponet": 33.40984845183311,
+  "fno": 81.3343721621665
+ },
+ "pinn_seconds_per_field": {
+  "strong": 56.39646917739992,
+  "mixed": 37.49967070820003
+ },
+ "breakeven_queries_vs_fd": {
+  "single": {
+   "deeponet": null,
+   "fno": null
+  },
+  "batch": {
+   "deeponet": null,
+   "fno": null
+  }
+ },
+ "breakeven_fields_vs_pinn": {
+  "strong": {
+   "deeponet": 0.5924102863024913,
+   "fno": 1.4421890829073407
+  },
+  "mixed": {
+   "deeponet": 0.8909371154698541,
+   "fno": 2.1689356366636354
+  }
+ },
+ "million_queries_seconds_single": {
+  "fd": 11.682500371534843,
+  "deeponet": 88.40534779212658,
+  "fno": 499.8933717890056,
+  "pinn_strong": 56396469.17739992,
+  "pinn_mixed": 37499670.70820003
+ }
+}

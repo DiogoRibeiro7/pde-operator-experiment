@@ -1,0 +1,12 @@
+{
+ "train": {
+  "max_relative_change_when_halving_quadrature_grid": 7.808868779883823e-14
+ },
+ "rough": {
+  "max_relative_change_when_halving_quadrature_grid": 7.24185280625367e-14
+ },
+ "high-contrast": {
+  "max_relative_change_when_halving_quadrature_grid": 1.9684107273214658e-13
+ },
+ "piecewise": "exact (closed form for piecewise-constant a)"
+}

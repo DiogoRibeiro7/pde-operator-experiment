@@ -1,0 +1,87 @@
+site_name: pde-operator-experiment
+site_description: A classical solver, a PINN, a DeepONet and an FNO on one elliptic PDE with an exact solution
+site_author: Diogo Ribeiro
+site_url: https://diogoribeiro7.github.io/pde-operator-experiment/
+repo_url: https://github.com/DiogoRibeiro7/pde-operator-experiment
+repo_name: DiogoRibeiro7/pde-operator-experiment
+edit_uri: edit/main/docs/
+copyright: Copyright &copy; 2026 Diogo Ribeiro &middot; Apache-2.0
+
+strict: true
+
+theme:
+  name: material
+  language: en
+  icon:
+    repo: fontawesome/brands/github
+    logo: material/function-variant
+  palette:
+    - scheme: slate
+      primary: indigo
+      accent: cyan
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+    - scheme: default
+      primary: indigo
+      accent: cyan
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - navigation.indexes
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.action.edit
+    - toc.follow
+
+hooks:
+  - tools/mkdocs_hooks.py
+
+nav:
+  - Home: index.md
+  - Design: design.md
+  - Results: results.md
+  - Reproduce: reproduce.md
+  - Code: code.md
+  - Cite: citing.md
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - footnotes
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+extra_css:
+  - stylesheets/extra.css
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/DiogoRibeiro7
+    - icon: fontawesome/brands/orcid
+      link: https://orcid.org/0009-0001-2022-7072
+    - icon: fontawesome/brands/medium
+      link: https://medium.com/@diogo-ribeiro-1975

@@ -1,0 +1,87 @@
+name: Release
+
+# Run from the Actions tab. Sets the version in pyproject.toml and
+# CITATION.cff, runs the checks, commits the bump if there is one, tags it
+# and publishes a GitHub release with the results and figures attached.
+# With the Zenodo GitHub integration enabled, each release gets a DOI.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, without the leading v (e.g. 1.0.1)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Validate the version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::'$VERSION' is not MAJOR.MINOR.PATCH"; exit 1; }
+          if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+            echo "::error::tag v$VERSION already exists"; exit 1
+          fi
+
+      - name: Set the version and release date
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          sed -i -E "s/^version = \".*\"/version = \"$VERSION\"/" pyproject.toml
+          sed -i -E "s/^version: .*/version: \"$VERSION\"/" CITATION.cff
+          sed -i -E "s/^date-released: .*/date-released: \"$(date -u +%F)\"/" CITATION.cff
+          git diff --stat
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Check
+        run: |
+          pip install -r requirements.txt
+          pip install -e ".[dev]"
+          ruff check .
+          pytest
+
+      - name: Commit, tag and push
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet; then
+            git commit -am "Release v$VERSION"
+            git push origin HEAD:main
+          fi
+          git tag -a "v$VERSION" -m "v$VERSION"
+          git push origin "v$VERSION"
+
+      - name: Package results and figures
+        env:
+          VERSION: ${{ inputs.version }}
+        run: zip -r "pde-operator-experiment-v$VERSION-results.zip" results figures
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          gh release create "v$VERSION" \
+            --title "v$VERSION" \
+            --generate-notes \
+            "pde-operator-experiment-v$VERSION-results.zip"

@@ -1,0 +1,35 @@
+{
+  "title": "pde-operator-experiment: a classical solver, a PINN, a DeepONet and an FNO on one elliptic PDE with an exact solution",
+  "upload_type": "software",
+  "description": "<p>A reproducible comparison of a finite-difference solver, a physics-informed neural network, a DeepONet and a Fourier neural operator on the one-dimensional elliptic equation -(a u')' = 1 with random coefficients, scored against an exact solution. It measures in-distribution accuracy, training-set size, distribution shift, resolution transfer and cost, with the classical solver treated as a competitor on equal terms. Code, results and figures accompany Part 3 of a Medium series on scientific machine learning.</p>",
+  "creators": [
+    {
+      "name": "Ribeiro, Diogo",
+      "affiliation": "Faculdade de Media Artes e Design, Universidade Técnica do Porto",
+      "orcid": "0009-0001-2022-7072"
+    }
+  ],
+  "license": "Apache-2.0",
+  "access_right": "open",
+  "keywords": [
+    "scientific machine learning",
+    "physics-informed neural networks",
+    "neural operators",
+    "DeepONet",
+    "Fourier neural operator",
+    "finite differences",
+    "reproducibility"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://medium.com/@diogo-ribeiro-1975/beyond-pinns-a-map-of-modern-neural-network-paradigms-ee5956e2df51",
+      "relation": "isSupplementTo",
+      "resource_type": "publication-other"
+    },
+    {
+      "identifier": "https://medium.com/@diogo-ribeiro-1975/pinns-vs-neural-operators-09b3e9806d6e",
+      "relation": "isSupplementTo",
+      "resource_type": "publication-other"
+    }
+  ]
+}
