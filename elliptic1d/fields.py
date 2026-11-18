@@ -88,6 +88,12 @@ def a(p: dict, x: np.ndarray) -> np.ndarray:
     return np.exp(log_a(p, x))
 
 
+def inv_a(p: dict, x: np.ndarray) -> np.ndarray:
+    """1/a, the quantity the exact solution integrates. g is a centred Gaussian
+    (or has N(0, sigma^2) levels), so 1/a = exp(-g) has the same distribution as a."""
+    return np.exp(-log_a(p, x))
+
+
 def inverse_a_primitives_piecewise(p: dict, x: np.ndarray):
     """Exact I0(x) = int_0^x 1/a and I1(x) = int_0^x s/a(s) ds for piecewise a."""
     n = p["levels"].shape[0]

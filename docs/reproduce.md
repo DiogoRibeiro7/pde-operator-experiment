@@ -19,6 +19,7 @@ Then run the pipeline in order:
 | Reference check | `python check_reference.py` | seconds | `results/reference_check.json` |
 | Solver baselines | `python baselines.py` | under a minute | `results/baselines.json` |
 | Input ablation | `python ablation_log_input.py` | about 4 min | `results/ablation_log_input.json` |
+| 1/a input ablation | `python ablation_inverse_input.py` | about 15 min | `results/ablation_inverse_input.json` |
 | FNO padding check | `python fno_padding_check.py` | seconds | `results/fno_padding_check.json` |
 | Timing | `python timing.py` | about 12 min | `results/timing.json` |
 | Figures | `python make_figures.py` | seconds | `figures/`, `results/derived.json` |
@@ -30,6 +31,7 @@ python run_experiment.py --quick                 # refuses to write into results
 python check_reference.py --results results-quick
 python baselines.py --results results-quick
 python ablation_log_input.py --results results-quick
+python ablation_inverse_input.py --results results-quick
 python fno_padding_check.py --results results-quick
 python timing.py --results results-quick
 python make_figures.py --results results-quick   # figures go to results-quick/figures/

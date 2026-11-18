@@ -42,6 +42,7 @@ jobs:
           python check_reference.py --results "$RESULTS"
           python baselines.py --results "$RESULTS"
           python ablation_log_input.py --results "$RESULTS"
+          python ablation_inverse_input.py --results "$RESULTS"
           python fno_padding_check.py --results "$RESULTS"
           python timing.py --results "$RESULTS"
           python make_figures.py --results "$RESULTS"

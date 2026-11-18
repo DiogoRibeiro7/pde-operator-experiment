@@ -17,6 +17,7 @@ run_experiment.py        the main experiment: sweep, shift, resolution, PINNs, t
 check_reference.py       how exact the exact solution is
 baselines.py             both solver variants on the common grid; matching grid sizes
 ablation_log_input.py    log a against a as the operators' input
+ablation_inverse_input.py  1/a against log a and a as the operators' input, on every family
 fno_padding_check.py     how the FNO's first spectral layer depends on the grid
 timing.py                one timing protocol for every method, training included, on one machine
 make_figures.py          figures and derived numbers

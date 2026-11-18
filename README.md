@@ -49,6 +49,7 @@ python run_experiment.py            # main run, about an hour on two CPU cores
 python check_reference.py           # quadrature check on the exact solution
 python baselines.py                 # both solver variants on the common 129-point grid
 python ablation_log_input.py        # log a against a as the operators' input (~4 min)
+python ablation_inverse_input.py    # 1/a against log a and a, on every family (~15 min)
 python fno_padding_check.py         # how the FNO's padding depends on the grid
 python timing.py                    # every method timed under one protocol (~12 min)
 python make_figures.py              # figures/ and results/derived.json
@@ -57,7 +58,7 @@ python make_figures.py              # figures/ and results/derived.json
 The main run writes `results/results.json`, `results/arrays.npz` (the arrays the
 figures draw), `results/models/` (the trained operators) and `results/run.log`. The
 other scripts read those and write `reference_check.json`, `baselines.json`,
-`ablation_log_input.json`, `fno_padding_check.json`, `timing.json` and `derived.json` next
+`ablation_log_input.json`, `ablation_inverse_input.json`, `fno_padding_check.json`, `timing.json` and `derived.json` next
 to them. Each takes
 `--results DIR`, so the whole pipeline also runs on `results-quick/`; `--quick` never
 writes into `results/`. The committed `results/` and `figures/` are the ones the
@@ -93,6 +94,7 @@ run_experiment.py        the main experiment
 check_reference.py       how exact is the exact solution
 baselines.py             solver variants on the common grid, matching grid sizes
 ablation_log_input.py    log a vs a as operator input
+ablation_inverse_input.py  1/a vs log a and a as operator input, on every family
 fno_padding_check.py     how the FNO's first layer depends on the grid
 timing.py                one timing protocol for every method
 make_figures.py          figures and derived numbers

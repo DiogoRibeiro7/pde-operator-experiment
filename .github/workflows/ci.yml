@@ -80,6 +80,7 @@ jobs:
           python check_reference.py --results results-quick
           python baselines.py --results results-quick
           python ablation_log_input.py --results results-quick
+          python ablation_inverse_input.py --results results-quick
           python fno_padding_check.py --results results-quick
           python timing.py --results results-quick
           python make_figures.py --results results-quick
