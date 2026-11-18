@@ -48,11 +48,11 @@ class Operator:
     feature: str = "log_a"
 
 
-FEATURES = {"log_a": fields.log_a, "a": fields.a}
+FEATURES = {"log_a": fields.log_a, "a": fields.a, "inv_a": fields.inv_a}
 
 
 def model_input(kind: str, cfg: Config, p: dict, n: int, feature: str = "log_a") -> np.ndarray:
-    """What each model reads: log a (or a, for the ablation) at the fixed sensors
+    """What each model reads: log a (or a or 1/a, for the ablations) at the fixed sensors
     (DeepONet) or on the n-point grid (FNO)."""
     pts = deeponet.sensors(cfg) if kind == "deeponet" else np.linspace(0.0, 1.0, n)
     return FEATURES[feature](p, pts)
