@@ -4,11 +4,13 @@ Both learn from the same data: coefficient fields a_i drawn from the training
 family and finite-difference solutions u_i on the 129-point grid. Both
 minimise the mean relative L2 error.
 
-Both read the log-coefficient g = log a rather than a itself, because a is
-log-normal and heavily skewed; ablation_log_input.py measures what that is
-worth. g is standardised with one global mean and standard deviation from
-the training set, a choice that does not depend on
-the grid and therefore works at any resolution.
+Both read the log-coefficient g = log a rather than a itself, which gives the
+lowest error on the training family. ablation_log_input.py measures that
+against a, and ablation_inverse_input.py against 1/a, which has the same
+distribution as a: the gain is not all down to the skew of a, and off the
+training family the ranking of the inputs changes. g is standardised with one
+global mean and standard deviation from the training set, a choice that does
+not depend on the grid and therefore works at any resolution.
 """
 
 from __future__ import annotations

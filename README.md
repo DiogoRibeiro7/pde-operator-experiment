@@ -106,9 +106,15 @@ tests/                   solver accuracy and order, models, repository consisten
 
 - **All three networks impose the boundary conditions exactly**, by multiplying their
   output by x(1 − x). No method pays a boundary penalty.
-- **The operators read log a, not a.** The coefficient is log-normal and heavily skewed;
-  reading a instead doubles the DeepONet's test error and multiplies the FNO's by 1.8
-  (`ablation_log_input.py`).
+- **The operators read log a, not a.** On the training family, reading a instead
+  doubles the DeepONet's test error and multiplies the FNO's by 1.8
+  (`ablation_log_input.py`). That comparison changes two things at once, the skew of the
+  input and the form of the map from input to solution, so it does not show that the skew
+  is the reason. Reading 1/a, which has exactly the same distribution as a and in which the
+  solution is linear apart from one scalar, changes only the form of the map: it lands
+  between a and log a on the training family, beats log a on rough and piecewise fields,
+  and loses on high-contrast ones (`ablation_inverse_input.py`). Off the training family
+  the FNO also does better reading a than log a on rough and piecewise fields.
 - **The PINN has two forms.** The strong form needs a′(x), which does not exist for
   piecewise-constant coefficients. The flux form (a second output q ≈ a u′, residuals
   q′ + f and u′ − q/a) needs only a(x). Both are run wherever both are defined.
